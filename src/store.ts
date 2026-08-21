@@ -1,4 +1,4 @@
-// ===== Zustand 스토어 (배번 오름차순 정렬 v6) =====
+// ===== Zustand 스토어 (공식 포지션표 적용 v7) =====
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Player, Game, PositionAssignment, SharedLineupData, BattingStats, PitchingStats, GameResult, GameType } from './types';
@@ -174,8 +174,8 @@ export const useAppStore = create<AppState>()(
 
       initializeWithDemo: () => {
         const { initialized, players } = get();
-        const isFirstPlayerJung = players.length > 0 && players[0].name === '정회제';
-        if (!initialized || !isFirstPlayerJung) {
+        const isOfficialPositionUpdated = players.some(p => p.name === '이건욱' && p.positions.includes('3B'));
+        if (!initialized || !isOfficialPositionUpdated) {
           set({
             players: demoPlayers,
             games: demoGames,
@@ -192,7 +192,7 @@ export const useAppStore = create<AppState>()(
         });
       },
     }),
-    { name: 'hanbang-swings-store-v6' }
+    { name: 'hanbang-swings-store-v7' }
   )
 );
 
