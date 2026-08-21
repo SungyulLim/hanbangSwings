@@ -8,17 +8,24 @@ interface Props {
 }
 
 const FIELDS: { key: keyof BattingStats; label: string }[] = [
-  { key: 'PA', label: 'PA' }, { key: 'AB', label: 'AB' }, { key: 'H', label: 'H' },
-  { key: '2B', label: '2B' }, { key: '3B', label: '3B' }, { key: 'HR', label: 'HR' },
-  { key: 'RBI', label: 'RBI' }, { key: 'R', label: 'R' }, { key: 'BB', label: 'BB' },
-  { key: 'SO', label: 'SO' }, { key: 'SB', label: 'SB' },
+  { key: 'PA', label: '타석' },
+  { key: 'AB', label: '타수' },
+  { key: 'H', label: '안타' },
+  { key: '2B', label: '2루타' },
+  { key: '3B', label: '3루타' },
+  { key: 'HR', label: '홈런' },
+  { key: 'RBI', label: '타점' },
+  { key: 'R', label: '득점' },
+  { key: 'BB', label: '볼넷' },
+  { key: 'SO', label: '삼진' },
+  { key: 'SB', label: '도루' },
 ];
 
 export default function BattingStatsForm({ stats, onChange }: Props) {
   const calc = singleGameBattingCalc(stats);
   const handleChange = (key: keyof BattingStats, value: string) => {
     if (key === 'playerId') return;
-    onChange({ ...stats, [key]: Math.max(0, value === '' ? 0 : parseInt(value) || 0) });
+    onChange({ ...stats, [key]: Math.max(0, value === '' ? 0 : parseInt(value, 10) || 0) });
   };
 
   return (
@@ -26,15 +33,19 @@ export default function BattingStatsForm({ stats, onChange }: Props) {
       <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
         {FIELDS.map(f => (
           <div key={f.key} className="text-center">
-            <label className="text-[10px] text-bw-500 block mb-1 font-medium">{f.label}</label>
+            <label className="text-[11px] text-slate-600 block mb-1 font-extrabold">{f.label}</label>
             <input
-              type="number" min="0" className="stat-input w-full"
-              value={stats[f.key] || ''} onChange={e => handleChange(f.key, e.target.value)} placeholder="0"
+              type="number"
+              min="0"
+              className="stat-input w-full"
+              value={stats[f.key] || ''}
+              onChange={e => handleChange(f.key, e.target.value)}
+              placeholder="0"
             />
           </div>
         ))}
       </div>
-      <div className="flex gap-4 flex-wrap mt-2">
+      <div className="flex gap-4 flex-wrap mt-2 bg-slate-100 p-2.5 rounded-xl border border-slate-200 justify-around">
         {[
           { label: '타율', value: formatRate(calc.BA) },
           { label: '출루율', value: formatRate(calc.OBP) },
@@ -42,8 +53,8 @@ export default function BattingStatsForm({ stats, onChange }: Props) {
           { label: 'OPS', value: formatRate(calc.OPS) },
         ].map(item => (
           <div key={item.label} className="text-center">
-            <div className="text-[10px] text-bw-400 font-medium">{item.label}</div>
-            <div className="text-sm font-bold text-white">{item.value}</div>
+            <div className="text-[10px] text-slate-500 font-extrabold">{item.label}</div>
+            <div className="text-sm font-black text-slate-900">{item.value}</div>
           </div>
         ))}
       </div>

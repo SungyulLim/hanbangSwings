@@ -30,8 +30,8 @@ export default function GameDetail() {
   const [tab, setTab] = useState<Tab>('lineup');
   const [internalTeamTab, setInternalTeamTab] = useState<'blue' | 'white'>('blue');
   const [showPlayerPicker, setShowPlayerPicker] = useState<Position | null>(null);
-  const [pickerSearch, setPickerSearch] = useState(''); // 선수 모달 검색어
-  const [quickSearch, setQuickSearch] = useState('');   // 직관적 선수 바로추가 검색어
+  const [pickerSearch, setPickerSearch] = useState('');
+  const [quickSearch, setQuickSearch] = useState('');
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -80,7 +80,6 @@ export default function GameDetail() {
 
   const assignedPlayerIds = new Set(currentAssignments.map(a => a.playerId));
 
-  // 모달 안에서 검색어에 따라 필터링된 선수 목록
   const filteredPickerPlayers = useMemo(() => {
     if (!pickerSearch.trim()) return sortedPlayersList;
     const q = pickerSearch.trim().toLowerCase();
@@ -89,7 +88,6 @@ export default function GameDetail() {
     );
   }, [sortedPlayersList, pickerSearch]);
 
-  // 바로 추가 검색어에 따라 필터링된 선수 목록 (미배정 우선)
   const quickSearchMatches = useMemo(() => {
     if (!quickSearch.trim()) return [];
     const q = quickSearch.trim().toLowerCase();
@@ -98,7 +96,6 @@ export default function GameDetail() {
     );
   }, [sortedPlayersList, quickSearch]);
 
-  // === 삭제 핸들러 ===
   const handleDeleteGame = () => {
     if (!isAdmin) {
       alert('경기 삭제 권한은 관리자 계정만 가지고 있습니다.');
@@ -109,8 +106,6 @@ export default function GameDetail() {
       navigate('/games');
     }
   };
-
-  // === 라인업 편집 핸들러 ===
 
   const handleOpenPicker = (position: Position) => {
     if (!isAdmin) {
@@ -170,8 +165,6 @@ export default function GameDetail() {
       setTimeout(() => setCopied(false), 2000);
     }
   };
-
-  // === 경기 기록 핸들러 ===
 
   const togglePlayer = (id: string) => {
     setSelectedPlayerIds(prev => {
@@ -290,7 +283,6 @@ export default function GameDetail() {
       {/* ===== 라인업 탭 ===== */}
       {tab === 'lineup' && (
         <div className="space-y-4">
-          {/* 청백전일 경우 청팀 / 백팀 선택 */}
           {isInternal && (
             <div className="flex gap-2">
               <button
@@ -316,7 +308,6 @@ export default function GameDetail() {
             </div>
           )}
 
-          {/* 실시간 선수 검색 배치 바 (관리자 전용) */}
           {isAdmin && isUpcoming && (
             <div className="glass-card p-3 bg-slate-900 text-white relative">
               <div className="flex items-center gap-2">
@@ -335,10 +326,9 @@ export default function GameDetail() {
                 )}
               </div>
 
-              {/* 검색 드롭다운 결과 */}
               {quickSearchMatches.length > 0 && (
                 <div className="absolute left-0 right-0 top-full mt-2 bg-white text-slate-900 border border-slate-200 rounded-xl shadow-xl z-30 max-h-64 overflow-y-auto p-2 space-y-1 animate-scale-in">
-                  <div className="text-[10px] text-slate-400 font-bold px-2 py-1 uppercase">검색된 선수 목록 (클릭 시 원하는 포지션 선택 가능)</div>
+                  <div className="text-[10px] text-slate-400 font-bold px-2 py-1 uppercase">검색된 선수 목록</div>
                   {quickSearchMatches.map(player => {
                     const isAlreadyAssigned = assignedPlayerIds.has(player.id);
                     return (
@@ -357,7 +347,6 @@ export default function GameDetail() {
                           )}
                         </div>
 
-                        {/* 포지션 선택 버튼들 */}
                         <div className="flex gap-1 flex-wrap justify-end">
                           {FIELD_POSITIONS.map(pos => (
                             <button
@@ -402,7 +391,6 @@ export default function GameDetail() {
           )}
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            {/* 다이아몬드 수비 위치 배치 */}
             <div className="glass-card p-5">
               <h3 className="font-bold text-slate-900 text-sm mb-3">수비 포지션 배치 (포지션 클릭 시 검색 선택)</h3>
               <DiamondField
@@ -433,7 +421,6 @@ export default function GameDetail() {
               )}
             </div>
 
-            {/* 타순 (1번 ~ 9번 + DH) */}
             <div className="glass-card p-5">
               <BattingOrderList
                 assignments={currentAssignments}
@@ -451,7 +438,6 @@ export default function GameDetail() {
       {tab === 'record' && (
         <div className="space-y-6">
           {game.status === 'completed' ? (
-            /* 완료된 경기: 기록 조회 */
             <div className="space-y-4">
               <div className="glass-card p-5">
                 <h3 className="font-bold text-slate-900 mb-3">경기 결과 스코어</h3>
@@ -468,7 +454,7 @@ export default function GameDetail() {
                 </div>
               </div>
 
-              {/* 타격 기록 조회 */}
+              {/* 타격 기록 조회 (한글 용어 헤더) */}
               {game.battingStats.length > 0 && (
                 <div className="glass-card overflow-hidden">
                   <div className="p-4 border-b border-slate-200 bg-slate-50">
@@ -478,7 +464,7 @@ export default function GameDetail() {
                     <table className="stats-table">
                       <thead>
                         <tr>
-                          <th>선수</th><th>PA</th><th>AB</th><th>H</th><th>2B</th><th>3B</th><th>HR</th><th>RBI</th><th>R</th><th>BB</th><th>SO</th><th>SB</th><th>BA</th>
+                          <th>선수</th><th>타석</th><th>타수</th><th>안타</th><th>2루타</th><th>3루타</th><th>홈런</th><th>타점</th><th>득점</th><th>볼넷</th><th>삼진</th><th>도루</th><th>타율</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -500,7 +486,7 @@ export default function GameDetail() {
                 </div>
               )}
 
-              {/* 투수 기록 조회 */}
+              {/* 투수 기록 조회 (한글 용어 헤더) */}
               {game.pitchingStats.length > 0 && (
                 <div className="glass-card overflow-hidden">
                   <div className="p-4 border-b border-slate-200 bg-slate-50">
@@ -510,7 +496,7 @@ export default function GameDetail() {
                     <table className="stats-table">
                       <thead>
                         <tr>
-                          <th>선수</th><th>W</th><th>L</th><th>SV</th><th>IP</th><th>H</th><th>R</th><th>ER</th><th>BB</th><th>SO</th><th>ERA</th>
+                          <th>선수</th><th>승</th><th>패</th><th>세이브</th><th>이닝</th><th>피안타</th><th>실점</th><th>자책점</th><th>사사구</th><th>탈삼진</th><th>ERA</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -532,7 +518,6 @@ export default function GameDetail() {
               )}
             </div>
           ) : (
-            /* 예정 경기: 기록 입력 */
             isAdmin ? (
               <div className="space-y-6">
                 <div className="glass-card p-5">
@@ -574,14 +559,14 @@ export default function GameDetail() {
                         recordStep === 'stats' ? 'text-slate-900 border-b-2 border-slate-900' : 'text-slate-400 hover:text-slate-600 disabled:opacity-40'
                       }`}
                     >
-                      2. 타격 / 투구 성적 입력 (투수 DH 겸업 지원)
+                      2. 타격 / 투구 성적 입력 (한글 용어 적용)
                     </button>
                   </div>
 
                   <div className="p-5">
                     {recordStep === 'select' && (
                       <div>
-                        <p className="text-xs text-slate-500 mb-3">경기에 출전한 선수들을 체크하세요.</p>
+                        <p className="text-xs text-slate-500 mb-3">경기에 출전한 선수들을 체크하세요. (배번순 정렬)</p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                           {sortedPlayersList.map(player => {
                             const isSelected = selectedPlayerIds.includes(player.id);
@@ -607,6 +592,11 @@ export default function GameDetail() {
 
                     {recordStep === 'stats' && (
                       <div className="space-y-6">
+                        <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg text-xs flex items-center gap-2 font-medium">
+                          <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
+                          각 항목(타석, 타수, 안타, 이닝, 자책점 등)을 한글 용어로 입력해 주세요.
+                        </div>
+
                         {selectedPlayers.map(player => (
                           <div key={`stat-${player.id}`} className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-4">
                             <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
@@ -621,7 +611,6 @@ export default function GameDetail() {
                               </div>
                             </div>
 
-                            {/* 타격 기록 */}
                             <div>
                               <h4 className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">⚾ 타격 기록</h4>
                               <BattingStatsForm
@@ -631,7 +620,6 @@ export default function GameDetail() {
                               />
                             </div>
 
-                            {/* 투구 기록 */}
                             <div className="pt-2 border-t border-slate-200">
                               <h4 className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">🥎 투구 기록</h4>
                               <PitchingStatsForm
@@ -664,7 +652,7 @@ export default function GameDetail() {
         </div>
       )}
 
-      {/* 실시간 이름/배번 검색 기능이 탑재된 선수 선택 모달 */}
+      {/* 선수 선택 모달 */}
       {showPlayerPicker && isAdmin && (
         <div className="modal-overlay" onClick={() => setShowPlayerPicker(null)}>
           <div className="modal-content p-5 max-w-md" onClick={e => e.stopPropagation()}>
@@ -678,13 +666,12 @@ export default function GameDetail() {
               </button>
             </div>
 
-            {/* 실시간 이름 / 배번 검색 인풋 */}
             <div className="relative mb-3">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
                 className="input-field pl-9 font-bold text-sm"
-                placeholder="선수 이름 또는 등번호 바로 검색 (예: 이건욱, #3)"
+                placeholder="선수 이름 또는 등번호 검색 (예: 이건욱, #3)"
                 value={pickerSearch}
                 onChange={e => setPickerSearch(e.target.value)}
                 autoFocus
@@ -699,7 +686,6 @@ export default function GameDetail() {
               )}
             </div>
 
-            {/* 선수 목록 */}
             <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
               {filteredPickerPlayers.map(player => {
                 const alreadyAssigned = assignedPlayerIds.has(player.id);

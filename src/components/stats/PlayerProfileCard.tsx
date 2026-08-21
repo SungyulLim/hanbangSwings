@@ -59,7 +59,7 @@ export default function PlayerProfileCard({ player, games, onClose }: Props) {
           
           <div className="flex items-center gap-5 relative z-10">
             <div className="w-16 h-16 rounded-xl bg-white text-slate-900 flex items-center justify-center font-black text-2xl shrink-0 shadow-md">
-              {player.number}
+              #{player.number}
             </div>
             <div>
               <h2 className="text-xl font-black text-white flex items-center gap-2">
@@ -72,7 +72,7 @@ export default function PlayerProfileCard({ player, games, onClose }: Props) {
                   </span>
                 ))}
                 <span className="text-xs text-slate-400 flex items-center gap-1 ml-1 font-medium">
-                  <Calendar className="w-3 h-3" /> 출전 {playerGames.length}경기
+                  <Calendar className="w-3.5 h-3.5" /> 출전 {playerGames.length}경기
                 </span>
               </div>
             </div>
@@ -128,7 +128,7 @@ export default function PlayerProfileCard({ player, games, onClose }: Props) {
             </div>
           )}
 
-          {/* 상세 스탯 */}
+          {/* 상세 스탯 (한글 용어 헤더) */}
           <div className="space-y-4">
             <div>
               <h4 className="text-xs font-extrabold text-slate-600 mb-2">타격 세부 기록</h4>
@@ -136,7 +136,7 @@ export default function PlayerProfileCard({ player, games, onClose }: Props) {
                 <table className="stats-table min-w-full">
                   <thead>
                     <tr>
-                      <th className="!text-left">G</th><th>PA</th><th>AB</th><th>H</th><th>2B</th><th>3B</th><th>HR</th><th>R</th><th>RBI</th><th>BB</th><th>SO</th><th>SB</th>
+                      <th className="!text-left">경기</th><th>타석</th><th>타수</th><th>안타</th><th>2루타</th><th>3루타</th><th>홈런</th><th>득점</th><th>타점</th><th>볼넷</th><th>삼진</th><th>도루</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -158,7 +158,7 @@ export default function PlayerProfileCard({ player, games, onClose }: Props) {
                   <table className="stats-table min-w-full">
                     <thead>
                       <tr>
-                        <th className="!text-left">G</th><th>W</th><th>L</th><th>SV</th><th>ERA</th><th>IP</th><th>H</th><th>R</th><th>ER</th><th>BB</th><th>SO</th>
+                        <th className="!text-left">경기</th><th>승</th><th>패</th><th>세이브</th><th>ERA</th><th>이닝</th><th>피안타</th><th>실점</th><th>자책점</th><th>사사구</th><th>탈삼진</th>
                       </tr>
                     </thead>
                     <tbody>

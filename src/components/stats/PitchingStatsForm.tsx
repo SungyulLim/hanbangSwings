@@ -8,9 +8,15 @@ interface Props {
 }
 
 const FIELDS: { key: keyof PitchingStats; label: string; step?: string }[] = [
-  { key: 'IP', label: 'IP', step: '0.1' }, { key: 'ER', label: 'ER' }, { key: 'R', label: 'R' },
-  { key: 'H', label: 'H' }, { key: 'SO', label: 'SO' }, { key: 'BB', label: 'BB' },
-  { key: 'W', label: 'W' }, { key: 'L', label: 'L' }, { key: 'SV', label: 'SV' },
+  { key: 'IP', label: '이닝', step: '0.1' },
+  { key: 'ER', label: '자책점' },
+  { key: 'R', label: '실점' },
+  { key: 'H', label: '피안타' },
+  { key: 'SO', label: '탈삼진' },
+  { key: 'BB', label: '사사구' },
+  { key: 'W', label: '승' },
+  { key: 'L', label: '패' },
+  { key: 'SV', label: '세이브' },
 ];
 
 export default function PitchingStatsForm({ stats, onChange }: Props) {
@@ -25,17 +31,22 @@ export default function PitchingStatsForm({ stats, onChange }: Props) {
       <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
         {FIELDS.map(f => (
           <div key={f.key} className="text-center">
-            <label className="text-[10px] text-bw-500 block mb-1 font-medium">{f.label}</label>
+            <label className="text-[11px] text-slate-600 block mb-1 font-extrabold">{f.label}</label>
             <input
-              type="number" min="0" step={f.step || '1'} className="stat-input w-full"
-              value={stats[f.key] || ''} onChange={e => handleChange(f.key, e.target.value)} placeholder="0"
+              type="number"
+              min="0"
+              step={f.step || '1'}
+              className="stat-input w-full"
+              value={stats[f.key] || ''}
+              onChange={e => handleChange(f.key, e.target.value)}
+              placeholder="0"
             />
           </div>
         ))}
       </div>
-      <div className="mt-2">
-        <div className="text-[10px] text-bw-400 font-medium">ERA</div>
-        <div className="text-sm font-bold text-white">{formatERA(era)}</div>
+      <div className="mt-2 bg-slate-100 p-2.5 rounded-xl border border-slate-200 inline-block px-4">
+        <div className="text-[10px] text-slate-500 font-extrabold">ERA (평균자책점)</div>
+        <div className="text-sm font-black text-slate-900">{formatERA(era)}</div>
       </div>
     </div>
   );
