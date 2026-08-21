@@ -1,7 +1,8 @@
 import { useSearchParams } from 'react-router-dom';
 import { decodeSharedLineup } from '../store';
 import { type Position, POSITION_LABELS } from '../types';
-import { Zap, Calendar, Users, ExternalLink } from 'lucide-react';
+import { Calendar, Users, ExternalLink } from 'lucide-react';
+import logoImg from '../assets/logo.png';
 
 const POSITION_COORDS: Record<string, { x: number; y: number }> = {
   CF: { x: 200, y: 30 },
@@ -24,7 +25,7 @@ export default function SharedLineup() {
     return (
       <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
         <div className="glass-card p-8 text-center max-w-md">
-          <Zap className="w-12 h-12 text-slate-900 mx-auto mb-4" />
+          <img src={logoImg} alt="한방 스윙스 로고" className="w-16 h-16 object-contain mx-auto mb-4" />
           <h1 className="text-xl font-extrabold text-slate-900 mb-2">링크를 찾을 수 없습니다</h1>
           <p className="text-slate-500 text-sm">라인업 데이터가 유효하지 않거나 만료되었습니다.</p>
           <a href="/" className="btn-primary mt-4 inline-flex">
@@ -46,9 +47,7 @@ export default function SharedLineup() {
       <div className="max-w-lg mx-auto space-y-6">
         {/* 헤더 */}
         <div className="text-center pt-6">
-          <div className="w-12 h-12 rounded-xl bg-slate-900 text-white flex items-center justify-center font-bold mx-auto mb-3 shadow-md">
-            <Zap className="w-6 h-6 text-white" />
-          </div>
+          <img src={logoImg} alt="한방 스윙스 로고" className="w-16 h-16 object-contain mx-auto mb-2 drop-shadow-xs" />
           <h1 className="text-2xl font-black text-slate-900">한방 스윙스</h1>
           <p className="text-slate-500 text-xs tracking-widest uppercase mt-1 font-bold">HANBANG SWINGS</p>
         </div>

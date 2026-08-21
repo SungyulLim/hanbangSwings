@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useAppStore } from '../../store';
-import { LayoutDashboard, Users, Calendar, Trophy, Menu, X, Zap, Key, LogOut, ShieldCheck, Lock } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Trophy, Menu, X, Key, LogOut, ShieldCheck, Lock } from 'lucide-react';
+import logoImg from '../../assets/logo.png';
 
 const navItems = [
   { to: '/', icon: LayoutDashboard, label: '대시보드' },
@@ -37,9 +38,11 @@ export default function Layout() {
       <header className="sticky top-0 z-50 bg-white/95 backdrop-blur-md border-b border-slate-200 shadow-xs">
         <div className="max-w-7xl mx-auto px-4 h-14 flex items-center justify-between">
           <NavLink to="/" className="flex items-center gap-3 group">
-            <div className="w-8 h-8 rounded-xl bg-slate-900 flex items-center justify-center shadow-sm group-hover:bg-slate-800 transition-colors">
-              <Zap className="w-4 h-4 text-white" />
-            </div>
+            <img
+              src={logoImg}
+              alt="한방 스윙스 로고"
+              className="w-10 h-10 object-contain group-hover:scale-105 transition-transform"
+            />
             <div>
               <h1 className="text-base font-black tracking-tight text-slate-900 leading-none">
                 한방 스윙스
