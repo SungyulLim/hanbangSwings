@@ -12,7 +12,7 @@ import PitchingStatsForm from '../components/stats/PitchingStatsForm';
 import { emptyBattingStats, emptyPitchingStats, formatRate, formatERA, singleGameBattingCalc, calcERA } from '../utils/stats';
 import {
   ArrowLeft, Share2, Copy, Check, X, Target,
-  ClipboardList, Calendar, ShieldAlert, Trash2, Lock
+  ClipboardList, Calendar, ShieldAlert, Trash2, Lock, Search, UserPlus
 } from 'lucide-react';
 
 type Tab = 'lineup' | 'record';
@@ -30,6 +30,8 @@ export default function GameDetail() {
   const [tab, setTab] = useState<Tab>('lineup');
   const [internalTeamTab, setInternalTeamTab] = useState<'blue' | 'white'>('blue');
   const [showPlayerPicker, setShowPlayerPicker] = useState<Position | null>(null);
+  const [pickerSearch, setPickerSearch] = useState(''); // 선수 모달 검색어
+  const [quickSearch, setQuickSearch] = useState('');   // 직관적 선수 바로추가 검색어
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
@@ -78,6 +80,24 @@ export default function GameDetail() {
 
   const assignedPlayerIds = new Set(currentAssignments.map(a => a.playerId));
 
+  // 모달 안에서 검색어에 따라 필터링된 선수 목록
+  const filteredPickerPlayers = useMemo(() => {
+    if (!pickerSearch.trim()) return sortedPlayersList;
+    const q = pickerSearch.trim().toLowerCase();
+    return sortedPlayersList.filter(p =>
+      p.name.toLowerCase().includes(q) || String(p.number).includes(q)
+    );
+  }, [sortedPlayersList, pickerSearch]);
+
+  // 바로 추가 검색어에 따라 필터링된 선수 목록 (미배정 우선)
+  const quickSearchMatches = useMemo(() => {
+    if (!quickSearch.trim()) return [];
+    const q = quickSearch.trim().toLowerCase();
+    return sortedPlayersList.filter(p =>
+      p.name.toLowerCase().includes(q) || String(p.number).includes(q)
+    );
+  }, [sortedPlayersList, quickSearch]);
+
   // === 삭제 핸들러 ===
   const handleDeleteGame = () => {
     if (!isAdmin) {
@@ -92,18 +112,20 @@ export default function GameDetail() {
 
   // === 라인업 편집 핸들러 ===
 
-  const handlePositionClick = (position: Position) => {
+  const handleOpenPicker = (position: Position) => {
     if (!isAdmin) {
       alert('라인업 포지션 배정은 관리자만 가능합니다.');
       return;
     }
     if (game.status === 'completed') return;
+    setPickerSearch('');
     setShowPlayerPicker(position);
   };
 
-  const handleAssignPlayer = (playerId: string) => {
-    if (!showPlayerPicker || !isAdmin) return;
-    const position = showPlayerPicker;
+  const handleAssignPlayer = (playerId: string, positionOverride?: Position) => {
+    const position = positionOverride || showPlayerPicker;
+    if (!position || !isAdmin) return;
+
     const maxOrder = currentAssignments.reduce((m, a) => Math.max(m, a.battingOrder), 0);
 
     let newAssignments = currentAssignments.filter(a => a.position !== position);
@@ -117,6 +139,7 @@ export default function GameDetail() {
     const targetTeam = isInternal ? internalTeamTab : 'main';
     updateGameAssignments(game.id, newAssignments, targetTeam);
     setShowPlayerPicker(null);
+    setQuickSearch('');
   };
 
   const handleRemovePosition = (position: string) => {
@@ -267,6 +290,7 @@ export default function GameDetail() {
       {/* ===== 라인업 탭 ===== */}
       {tab === 'lineup' && (
         <div className="space-y-4">
+          {/* 청백전일 경우 청팀 / 백팀 선택 */}
           {isInternal && (
             <div className="flex gap-2">
               <button
@@ -292,6 +316,73 @@ export default function GameDetail() {
             </div>
           )}
 
+          {/* 실시간 선수 검색 배치 바 (관리자 전용) */}
+          {isAdmin && isUpcoming && (
+            <div className="glass-card p-3 bg-slate-900 text-white relative">
+              <div className="flex items-center gap-2">
+                <Search className="w-4 h-4 text-slate-400 shrink-0 ml-2" />
+                <input
+                  type="text"
+                  placeholder="선수 이름 또는 등번호 직접 검색하여 타순/포지션에 바로 추가..."
+                  className="bg-transparent text-white placeholder-slate-400 text-xs flex-1 outline-none font-bold py-1.5"
+                  value={quickSearch}
+                  onChange={e => setQuickSearch(e.target.value)}
+                />
+                {quickSearch && (
+                  <button onClick={() => setQuickSearch('')} className="text-slate-400 hover:text-white mr-1">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* 검색 드롭다운 결과 */}
+              {quickSearchMatches.length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-2 bg-white text-slate-900 border border-slate-200 rounded-xl shadow-xl z-30 max-h-64 overflow-y-auto p-2 space-y-1 animate-scale-in">
+                  <div className="text-[10px] text-slate-400 font-bold px-2 py-1 uppercase">검색된 선수 목록 (클릭 시 원하는 포지션 선택 가능)</div>
+                  {quickSearchMatches.map(player => {
+                    const isAlreadyAssigned = assignedPlayerIds.has(player.id);
+                    return (
+                      <div
+                        key={player.id}
+                        className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-100 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="w-7 h-7 rounded bg-slate-900 text-white text-xs font-black flex items-center justify-center">
+                            #{player.number}
+                          </span>
+                          <span className="font-extrabold text-sm">{player.name}</span>
+                          <span className="text-xs text-slate-500 font-medium">({player.positions?.join(', ')})</span>
+                          {isAlreadyAssigned && (
+                            <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">배정됨</span>
+                          )}
+                        </div>
+
+                        {/* 포지션 선택 버튼들 */}
+                        <div className="flex gap-1 flex-wrap justify-end">
+                          {FIELD_POSITIONS.map(pos => (
+                            <button
+                              key={pos}
+                              onClick={() => handleAssignPlayer(player.id, pos)}
+                              className="px-2 py-1 rounded text-xs font-bold bg-slate-100 hover:bg-slate-900 hover:text-white transition-colors border border-slate-200"
+                            >
+                              {pos}
+                            </button>
+                          ))}
+                          <button
+                            onClick={() => handleAssignPlayer(player.id, 'DH')}
+                            className="px-2 py-1 rounded text-xs font-bold bg-amber-100 text-amber-900 hover:bg-amber-600 hover:text-white transition-colors border border-amber-200"
+                          >
+                            DH
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center justify-between">
             <h3 className="font-extrabold text-slate-900 text-base">
               {isInternal ? (internalTeamTab === 'blue' ? '청팀 선발 라인업' : '백팀 선발 라인업') : '선발 라인업 & 타순'}
@@ -313,11 +404,11 @@ export default function GameDetail() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             {/* 다이아몬드 수비 위치 배치 */}
             <div className="glass-card p-5">
-              <h3 className="font-bold text-slate-900 text-sm mb-3">수비 포지션 배치 (투수 P 포함)</h3>
+              <h3 className="font-bold text-slate-900 text-sm mb-3">수비 포지션 배치 (포지션 클릭 시 검색 선택)</h3>
               <DiamondField
                 assignments={diamondAssignments}
                 players={players}
-                onPositionClick={handlePositionClick}
+                onPositionClick={handleOpenPicker}
                 readOnly={!isAdmin || !isUpcoming}
               />
               {isAdmin && isUpcoming && (
@@ -327,14 +418,14 @@ export default function GameDetail() {
                     return (
                       <button
                         key={pos}
-                        onClick={() => handlePositionClick(pos)}
+                        onClick={() => handleOpenPicker(pos)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
                           existing
                             ? 'bg-slate-900 text-white border-slate-900'
                             : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
                         }`}
                       >
-                        {POSITION_LABELS[pos]}: {existing ? players.find(p => p.id === existing.playerId)?.name : '미정'}
+                        {POSITION_LABELS[pos]}: {existing ? players.find(p => p.id === existing.playerId)?.name : '미정 (검색)'}
                       </button>
                     );
                   })}
@@ -444,7 +535,6 @@ export default function GameDetail() {
             /* 예정 경기: 기록 입력 */
             isAdmin ? (
               <div className="space-y-6">
-                {/* 스코어 입력 */}
                 <div className="glass-card p-5">
                   <h3 className="font-bold text-slate-900 mb-3">경기 결과 및 스코어 입력</h3>
                   <div className="grid grid-cols-3 gap-3">
@@ -467,7 +557,6 @@ export default function GameDetail() {
                   </div>
                 </div>
 
-                {/* 선수선택 vs 기록입력 탭 */}
                 <div className="glass-card">
                   <div className="flex border-b border-slate-200">
                     <button
@@ -492,7 +581,7 @@ export default function GameDetail() {
                   <div className="p-5">
                     {recordStep === 'select' && (
                       <div>
-                        <p className="text-xs text-slate-500 mb-3">경기에 출전한 선수들을 체크하세요. (배번순 정렬)</p>
+                        <p className="text-xs text-slate-500 mb-3">경기에 출전한 선수들을 체크하세요.</p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
                           {sortedPlayersList.map(player => {
                             const isSelected = selectedPlayerIds.includes(player.id);
@@ -518,11 +607,6 @@ export default function GameDetail() {
 
                     {recordStep === 'stats' && (
                       <div className="space-y-6">
-                        <div className="bg-amber-50 border border-amber-200 text-amber-800 p-3 rounded-lg text-xs flex items-center gap-2 font-medium">
-                          <ShieldAlert className="w-4 h-4 text-amber-600 shrink-0" />
-                          투수가 지명타자(DH)나 타자로 출전한 경우, 아래에서 타격 기록과 투구 기록을 모두 입력할 수 있습니다.
-                        </div>
-
                         {selectedPlayers.map(player => (
                           <div key={`stat-${player.id}`} className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-4">
                             <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
@@ -580,20 +664,44 @@ export default function GameDetail() {
         </div>
       )}
 
-      {/* 선수 선택 모달 (배번 오름차순 정렬) */}
+      {/* 실시간 이름/배번 검색 기능이 탑재된 선수 선택 모달 */}
       {showPlayerPicker && isAdmin && (
         <div className="modal-overlay" onClick={() => setShowPlayerPicker(null)}>
-          <div className="modal-content p-5" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="font-bold text-slate-900">
-                {POSITION_LABELS[showPlayerPicker]} ({showPlayerPicker}) 포지션 선수 배치
+          <div className="modal-content p-5 max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-green-600" />
+                {POSITION_LABELS[showPlayerPicker]} ({showPlayerPicker}) 포지션 선수 선택
               </h3>
               <button onClick={() => setShowPlayerPicker(null)} className="text-slate-400 hover:text-slate-700">
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="space-y-1 max-h-80 overflow-y-auto">
-              {sortedPlayersList.map(player => {
+
+            {/* 실시간 이름 / 배번 검색 인풋 */}
+            <div className="relative mb-3">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                className="input-field pl-9 font-bold text-sm"
+                placeholder="선수 이름 또는 등번호 바로 검색 (예: 이건욱, #3)"
+                value={pickerSearch}
+                onChange={e => setPickerSearch(e.target.value)}
+                autoFocus
+              />
+              {pickerSearch && (
+                <button
+                  onClick={() => setPickerSearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+
+            {/* 선수 목록 */}
+            <div className="space-y-1.5 max-h-80 overflow-y-auto pr-1">
+              {filteredPickerPlayers.map(player => {
                 const alreadyAssigned = assignedPlayerIds.has(player.id);
                 const isCurrentPos = currentAssignments.find(
                   a => a.position === showPlayerPicker && a.playerId === player.id
@@ -603,33 +711,46 @@ export default function GameDetail() {
                     key={player.id}
                     onClick={() => handleAssignPlayer(player.id)}
                     disabled={alreadyAssigned && !isCurrentPos}
-                    className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left transition-all border ${
+                    className={`w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-left transition-all border ${
                       isCurrentPos
-                        ? 'bg-slate-900 text-white border-slate-900'
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
                         : alreadyAssigned
-                        ? 'opacity-30 cursor-not-allowed border-transparent bg-slate-50'
-                        : 'border-slate-200 hover:bg-slate-100'
+                        ? 'opacity-40 cursor-not-allowed border-transparent bg-slate-100'
+                        : 'border-slate-200 hover:bg-slate-100 hover:border-slate-300'
                     }`}
                   >
-                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm ${
+                    <div className={`w-9 h-9 rounded-lg flex items-center justify-center font-black text-xs shrink-0 ${
                       isCurrentPos ? 'bg-white text-black' : 'bg-slate-200 text-slate-800'
                     }`}>
                       #{player.number}
                     </div>
-                    <div>
-                      <div className="font-bold text-sm">{player.name}</div>
-                      <div className="text-xs opacity-70 flex gap-1 mt-0.5">
+                    <div className="flex-1 min-w-0">
+                      <div className="font-extrabold text-sm truncate">{player.name}</div>
+                      <div className="text-[11px] opacity-70 flex gap-1 mt-0.5">
                         {player.positions?.map(p => (
-                          <span key={p} className="underline font-semibold">{p}</span>
+                          <span key={p} className="font-semibold">{p}</span>
                         ))}
                       </div>
                     </div>
                     {alreadyAssigned && !isCurrentPos && (
-                      <span className="ml-auto text-xs opacity-50 font-medium">배정됨</span>
+                      <span className="ml-auto text-[11px] opacity-60 font-bold bg-slate-200 text-slate-700 px-2 py-0.5 rounded">
+                        타 포지션 배정됨
+                      </span>
+                    )}
+                    {isCurrentPos && (
+                      <span className="ml-auto text-xs font-bold text-white bg-slate-800 px-2 py-0.5 rounded">
+                        현재 배정
+                      </span>
                     )}
                   </button>
                 );
               })}
+
+              {filteredPickerPlayers.length === 0 && (
+                <div className="text-center py-8 text-slate-400 text-xs">
+                  '{pickerSearch}' 검색 결과가 없습니다.
+                </div>
+              )}
             </div>
           </div>
         </div>
