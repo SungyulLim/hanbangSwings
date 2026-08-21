@@ -10,9 +10,11 @@ import BattingOrderList from '../components/lineup/BattingOrderList';
 import BattingStatsForm from '../components/stats/BattingStatsForm';
 import PitchingStatsForm from '../components/stats/PitchingStatsForm';
 import { emptyBattingStats, emptyPitchingStats, formatRate, formatERA, singleGameBattingCalc, calcERA } from '../utils/stats';
+import { downloadGameRecordTemplate, parseGameRecordExcel, type ParsedExcelResult } from '../utils/excelUtils';
 import {
   ArrowLeft, Share2, Copy, Check, X, Target,
-  ClipboardList, Calendar, ShieldAlert, Trash2, Lock, Search, UserPlus
+  ClipboardList, Calendar, ShieldAlert, Trash2, Lock, Search, UserPlus,
+  FileSpreadsheet, Upload, Download, Sparkles, AlertCircle
 } from 'lucide-react';
 
 type Tab = 'lineup' | 'record';
@@ -43,6 +45,10 @@ export default function GameDetail() {
   const [battingData, setBattingData] = useState<Record<string, BattingStats>>({});
   const [pitchingData, setPitchingData] = useState<Record<string, PitchingStats>>({});
   const [recordStep, setRecordStep] = useState<'select' | 'stats'>('select');
+
+  // 엑셀 관련 상태
+  const [excelModalData, setExcelModalData] = useState<ParsedExcelResult | null>(null);
+  const [isParsingExcel, setIsParsingExcel] = useState(false);
 
   // 선수 목록 배번 오름차순 정렬
   const sortedPlayersList = useMemo(() => {
@@ -207,6 +213,62 @@ export default function GameDetail() {
       finalBatting, finalPitching
     );
     alert('경기 기록이 저장되었습니다!');
+  };
+
+  const handleDownloadTemplate = () => {
+    if (!game) return;
+    const title = isInternal ? `한방스윙스_청백전_${game.gameDate}` : `한방스윙스_vs_${game.opponent}_${game.gameDate}`;
+    downloadGameRecordTemplate(players, title);
+  };
+
+  const handleExcelFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsParsingExcel(true);
+    try {
+      const parsed = await parseGameRecordExcel(file, players);
+      if (parsed.matchedPlayerIds.length === 0) {
+        alert('엑셀 파일에서 매칭된 선수 성적을 찾을 수 없습니다. 이름이나 등번호가 등록된 로스터와 일치하는지 확인해 주세요.');
+      } else {
+        setExcelModalData(parsed);
+      }
+    } catch (err) {
+      console.error(err);
+      alert('엑셀 파일 분석 중 오류가 발생했습니다. 올바른 .xlsx 또는 .csv 파일인지 확인해 주세요.');
+    } finally {
+      setIsParsingExcel(false);
+      e.target.value = '';
+    }
+  };
+
+  const handleApplyExcelRecord = () => {
+    if (!excelModalData) return;
+    const { matchedPlayerIds, battingData: newBatting, pitchingData: newPitching } = excelModalData;
+
+    setSelectedPlayerIds(prev => {
+      const set = new Set([...prev, ...matchedPlayerIds]);
+      return Array.from(set);
+    });
+
+    setBattingData(prev => {
+      const next = { ...prev };
+      Object.keys(newBatting).forEach(pid => {
+        next[pid] = newBatting[pid];
+      });
+      return next;
+    });
+
+    setPitchingData(prev => {
+      const next = { ...prev };
+      Object.keys(newPitching).forEach(pid => {
+        next[pid] = newPitching[pid];
+      });
+      return next;
+    });
+
+    setExcelModalData(null);
+    setRecordStep('stats');
+    alert(`${matchedPlayerIds.length}명 선수의 기록이 엑셀에서 성공적으로 불러와졌습니다!`);
   };
 
   const isUpcoming = game.status === 'upcoming';
@@ -542,6 +604,44 @@ export default function GameDetail() {
                   </div>
                 </div>
 
+                {/* 엑셀 파일 업로드 & 양식 다운로드 스마트 바 */}
+                <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-emerald-600 text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
+                      <FileSpreadsheet className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-extrabold text-emerald-950 flex items-center gap-1.5">
+                        엑셀(Excel) 파일로 경기 기록 일괄 입력
+                        <span className="badge bg-emerald-600 text-white text-[10px] px-1.5 py-0.2">스마트 매칭</span>
+                      </h4>
+                      <p className="text-xs text-emerald-800 font-medium">선수 목록이 채워진 양식을 받거나, 작성된 엑셀을 업로드하여 성적을 한 번에 반영하세요.</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 w-full sm:w-auto shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleDownloadTemplate}
+                      className="flex-1 sm:flex-initial px-3 py-2 rounded-lg bg-white border border-emerald-300 text-emerald-800 hover:bg-emerald-100 text-xs font-bold transition-all flex items-center justify-center gap-1.5 shadow-2xs"
+                    >
+                      <Download className="w-3.5 h-3.5 text-emerald-700" />
+                      양식 다운로드
+                    </button>
+                    <label className="flex-1 sm:flex-initial px-3.5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-extrabold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs">
+                      <Upload className="w-3.5 h-3.5" />
+                      {isParsingExcel ? '분석 중...' : '엑셀 업로드'}
+                      <input
+                        type="file"
+                        accept=".xlsx, .xls, .csv"
+                        className="hidden"
+                        onChange={handleExcelFileUpload}
+                        disabled={isParsingExcel}
+                      />
+                    </label>
+                  </div>
+                </div>
+
                 <div className="glass-card">
                   <div className="flex border-b border-slate-200">
                     <button
@@ -737,6 +837,82 @@ export default function GameDetail() {
                   '{pickerSearch}' 검색 결과가 없습니다.
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 엑셀 데이터 파싱 미리보기 모달 */}
+      {excelModalData && (
+        <div className="modal-overlay" onClick={() => setExcelModalData(null)}>
+          <div className="modal-content p-6 max-w-lg" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
+              <h3 className="font-extrabold text-slate-900 text-lg flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-emerald-600" />
+                엑셀 기록 파싱 완료
+              </h3>
+              <button onClick={() => setExcelModalData(null)} className="text-slate-400 hover:text-slate-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-emerald-900 text-sm font-semibold">
+                🎉 총 <span className="font-extrabold text-emerald-700">{excelModalData.matchedPlayerIds.length}명</span>의 출전 선수 성적이 성공적으로 매칭되었습니다.
+              </div>
+
+              {excelModalData.unmatchedRows.length > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-900">
+                  <div className="font-bold flex items-center gap-1 mb-1 text-amber-950">
+                    <AlertCircle className="w-4 h-4 text-amber-600" />
+                    로스터 미일치 행 ({excelModalData.unmatchedRows.length}건)
+                  </div>
+                  <p className="text-[11px] text-amber-800">아래 행은 등록된 선수 등번호/이름과 일치하지 않아 제외되었습니다:</p>
+                  <ul className="mt-1 font-mono text-[10px] bg-white/70 p-2 rounded max-h-24 overflow-y-auto space-y-0.5">
+                    {excelModalData.unmatchedRows.map((r, i) => (
+                      <li key={i}>{r}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <div className="max-h-60 overflow-y-auto space-y-2 pr-1">
+                <h4 className="text-xs font-bold text-slate-500">매칭된 선수 성적 요약</h4>
+                {excelModalData.matchedPlayerIds.map(pid => {
+                  const p = players.find(pl => pl.id === pid);
+                  const b = excelModalData.battingData[pid];
+                  const pr = excelModalData.pitchingData[pid];
+                  return (
+                    <div key={pid} className="bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-500">#{p?.number}</span>
+                        <span className="font-extrabold text-slate-900">{p?.name}</span>
+                      </div>
+                      <div className="flex gap-2 text-[11px]">
+                        {b && (
+                          <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded font-bold">
+                            타격: {b.PA}타석 {b.AB}타수 {b.H}안타 {b.HR > 0 ? `(${b.HR}홈런)` : ''} {b.RBI}타점
+                          </span>
+                        )}
+                        {pr && (
+                          <span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded font-bold">
+                            투구: {pr.IP}이닝 {pr.ER}자책 {pr.SO}K
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
+                <button onClick={() => setExcelModalData(null)} className="btn-secondary text-xs px-4 py-2.5">
+                  취소
+                </button>
+                <button onClick={handleApplyExcelRecord} className="btn-primary text-xs px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white">
+                  <Check className="w-4 h-4" /> 기록 폼에 바로 반영하기
+                </button>
+              </div>
             </div>
           </div>
         </div>
