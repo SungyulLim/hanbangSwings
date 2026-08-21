@@ -1,4 +1,4 @@
-// ===== 데모 데이터 (26-2 공식 포지션 표 반영) =====
+// ===== 데모 데이터 (4월 12일 청백전 실제 완료 기록 포함) =====
 import type { Player, Game } from '../types';
 
 export const demoPlayers: Player[] = [
@@ -28,6 +28,59 @@ export const demoPlayers: Player[] = [
 ];
 
 export const demoGames: Game[] = [
+  {
+    id: 'g04',
+    gameDate: '2026-04-12',
+    opponent: '한방 스윙스 4월 12일 청백전',
+    gameType: 'internal',
+    status: 'completed',
+    result: 'W',
+    scoreUs: 10,
+    scoreThem: 2,
+    createdAt: '2026-04-12',
+    assignments: [],
+    blueAssignments: [
+      { position: '1B', playerId: 'p18', battingOrder: 1 },
+      { position: '3B', playerId: 'p16', battingOrder: 2 },
+      { position: '2B', playerId: 'p22', battingOrder: 3 },
+      { position: 'SS', playerId: 'p09', battingOrder: 4 },
+      { position: 'P', playerId: 'p03', battingOrder: 5 },
+    ],
+    whiteAssignments: [
+      { position: 'SS', playerId: 'p06', battingOrder: 1 },
+      { position: 'CF', playerId: 'p11', battingOrder: 2 },
+      { position: 'LF', playerId: 'p01', battingOrder: 3 },
+      { position: 'P', playerId: 'p23', battingOrder: 4 },
+      { position: '2B', playerId: 'p07', battingOrder: 5 },
+      { position: 'C', playerId: 'p10', battingOrder: 6 },
+      { position: 'RF', playerId: 'p21', battingOrder: 7 },
+    ],
+    battingStats: [
+      // 청팀 타격 기록
+      { playerId: 'p18', PA: 3, AB: 1, H: 0, '2B': 0, '3B': 0, HR: 0, RBI: 0, R: 1, BB: 2, SO: 0, SB: 2 },
+      { playerId: 'p16', PA: 3, AB: 3, H: 1, '2B': 0, '3B': 0, HR: 0, RBI: 0, R: 1, BB: 0, SO: 0, SB: 1 },
+      { playerId: 'p22', PA: 3, AB: 2, H: 0, '2B': 0, '3B': 0, HR: 0, RBI: 0, R: 1, BB: 1, SO: 1, SB: 0 },
+      { playerId: 'p09', PA: 3, AB: 3, H: 0, '2B': 0, '3B': 0, HR: 0, RBI: 0, R: 1, BB: 0, SO: 1, SB: 0 },
+      { playerId: 'p03', PA: 2, AB: 2, H: 1, '2B': 0, '3B': 0, HR: 0, RBI: 0, R: 1, BB: 0, SO: 0, SB: 0 },
+      // 백팀 타격 기록
+      { playerId: 'p06', PA: 3, AB: 3, H: 1, '2B': 0, '3B': 0, HR: 0, RBI: 1, R: 0, BB: 0, SO: 0, SB: 0 },
+      { playerId: 'p11', PA: 3, AB: 3, H: 0, '2B': 0, '3B': 0, HR: 0, RBI: 0, R: 0, BB: 0, SO: 1, SB: 0 },
+      { playerId: 'p01', PA: 3, AB: 2, H: 0, '2B': 0, '3B': 0, HR: 0, RBI: 0, R: 0, BB: 1, SO: 1, SB: 1 },
+      { playerId: 'p23', PA: 3, AB: 1, H: 1, '2B': 0, '3B': 0, HR: 0, RBI: 0, R: 1, BB: 2, SO: 0, SB: 2 },
+      { playerId: 'p07', PA: 2, AB: 1, H: 0, '2B': 0, '3B': 0, HR: 0, RBI: 0, R: 0, BB: 1, SO: 0, SB: 0 },
+      { playerId: 'p10', PA: 3, AB: 3, H: 1, '2B': 0, '3B': 0, HR: 0, RBI: 0, R: 1, BB: 0, SO: 1, SB: 1 },
+      { playerId: 'p21', PA: 2, AB: 1, H: 0, '2B': 0, '3B': 0, HR: 0, RBI: 0, R: 0, BB: 1, SO: 1, SB: 0 },
+    ],
+    pitchingStats: [
+      // 청팀 투수
+      { playerId: 'p03', IP: 1.0, ER: 0, R: 0, H: 0, SO: 1, BB: 3, W: 1, L: 0, SV: 0 },
+      { playerId: 'p16', IP: 1.0, ER: 0, R: 0, H: 1, SO: 0, BB: 0, W: 0, L: 0, SV: 0 },
+      // 백팀 투수
+      { playerId: 'p06', IP: 1.0, ER: 7, R: 7, H: 4, SO: 1, BB: 3, W: 0, L: 1, SV: 0 },
+      { playerId: 'p07', IP: 2.0, ER: 3, R: 3, H: 0, SO: 1, BB: 1, W: 0, L: 0, SV: 0 },
+      { playerId: 'p23', IP: 1.0, ER: 0, R: 0, H: 0, SO: 2, BB: 2, W: 0, L: 0, SV: 0 },
+    ],
+  },
   {
     id: 'g01',
     gameDate: '2026-04-05',
@@ -68,7 +121,7 @@ export const demoGames: Game[] = [
   {
     id: 'g02',
     gameDate: '2026-05-15',
-    opponent: '한방 스윙스 청백전',
+    opponent: '한방 스윙스 5월 청백전',
     gameType: 'internal',
     status: 'completed',
     result: 'W',
@@ -108,18 +161,5 @@ export const demoGames: Game[] = [
       { playerId: 'p15', IP: 5, ER: 3, R: 4, H: 6, SO: 5, BB: 2, W: 1, L: 0, SV: 0 },
       { playerId: 'p18', IP: 5, ER: 4, R: 5, H: 7, SO: 4, BB: 1, W: 0, L: 1, SV: 0 },
     ],
-  },
-  {
-    id: 'g03',
-    gameDate: '2026-08-30',
-    opponent: '한방 스윙스 8월 청백전',
-    gameType: 'internal',
-    status: 'upcoming',
-    createdAt: '2026-08-20',
-    assignments: [],
-    blueAssignments: [],
-    whiteAssignments: [],
-    battingStats: [],
-    pitchingStats: [],
   },
 ];

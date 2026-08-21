@@ -1,4 +1,4 @@
-// ===== Zustand 스토어 (공식 포지션표 적용 v7) =====
+// ===== Zustand 스토어 (4월 12일 청백전 매치 반영 v8) =====
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Player, Game, PositionAssignment, SharedLineupData, BattingStats, PitchingStats, GameResult, GameType } from './types';
@@ -173,9 +173,9 @@ export const useAppStore = create<AppState>()(
       },
 
       initializeWithDemo: () => {
-        const { initialized, players } = get();
-        const isOfficialPositionUpdated = players.some(p => p.name === '이건욱' && p.positions.includes('3B'));
-        if (!initialized || !isOfficialPositionUpdated) {
+        const { initialized, games } = get();
+        const hasApril12Game = games.some(g => g.gameDate === '2026-04-12');
+        if (!initialized || !hasApril12Game) {
           set({
             players: demoPlayers,
             games: demoGames,
@@ -192,7 +192,7 @@ export const useAppStore = create<AppState>()(
         });
       },
     }),
-    { name: 'hanbang-swings-store-v7' }
+    { name: 'hanbang-swings-store-v8' }
   )
 );
 
