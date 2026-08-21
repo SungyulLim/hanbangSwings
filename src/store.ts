@@ -1,4 +1,4 @@
-// ===== Zustand 스토어 (공식 26-2 배번 적용 버전) =====
+// ===== Zustand 스토어 (배번 오름차순 정렬 v6) =====
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Player, Game, PositionAssignment, SharedLineupData, BattingStats, PitchingStats, GameResult, GameType } from './types';
@@ -174,8 +174,8 @@ export const useAppStore = create<AppState>()(
 
       initializeWithDemo: () => {
         const { initialized, players } = get();
-        const isOfficialJerseyUpdated = players.some(p => p.name === '이준민' && p.number === 39);
-        if (!initialized || !isOfficialJerseyUpdated) {
+        const isFirstPlayerJung = players.length > 0 && players[0].name === '정회제';
+        if (!initialized || !isFirstPlayerJung) {
           set({
             players: demoPlayers,
             games: demoGames,
@@ -192,7 +192,7 @@ export const useAppStore = create<AppState>()(
         });
       },
     }),
-    { name: 'hanbang-swings-store-v5' }
+    { name: 'hanbang-swings-store-v6' }
   )
 );
 

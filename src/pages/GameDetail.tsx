@@ -12,7 +12,7 @@ import PitchingStatsForm from '../components/stats/PitchingStatsForm';
 import { emptyBattingStats, emptyPitchingStats, formatRate, formatERA, singleGameBattingCalc, calcERA } from '../utils/stats';
 import {
   ArrowLeft, Share2, Copy, Check, X, Target,
-  ClipboardList, Calendar, ShieldAlert, Trash2, Lock, Users, Swords
+  ClipboardList, Calendar, ShieldAlert, Trash2, Lock
 } from 'lucide-react';
 
 type Tab = 'lineup' | 'record';
@@ -28,7 +28,7 @@ export default function GameDetail() {
   const game = games.find(g => g.id === gameId);
 
   const [tab, setTab] = useState<Tab>('lineup');
-  const [internalTeamTab, setInternalTeamTab] = useState<'blue' | 'white'>('blue'); // 청백전 청팀/백팀 선택
+  const [internalTeamTab, setInternalTeamTab] = useState<'blue' | 'white'>('blue');
   const [showPlayerPicker, setShowPlayerPicker] = useState<Position | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -41,6 +41,11 @@ export default function GameDetail() {
   const [battingData, setBattingData] = useState<Record<string, BattingStats>>({});
   const [pitchingData, setPitchingData] = useState<Record<string, PitchingStats>>({});
   const [recordStep, setRecordStep] = useState<'select' | 'stats'>('select');
+
+  // 선수 목록 배번 오름차순 정렬
+  const sortedPlayersList = useMemo(() => {
+    return [...players].sort((a, b) => a.number - b.number);
+  }, [players]);
 
   if (!game) {
     return (
@@ -55,7 +60,6 @@ export default function GameDetail() {
 
   const isInternal = game.gameType === 'internal';
 
-  // 대외경기 라인업 vs 청백전 청팀/백팀 라인업 선택
   const currentAssignments = useMemo(() => {
     if (isInternal) {
       return internalTeamTab === 'blue' ? (game.blueAssignments || []) : (game.whiteAssignments || []);
@@ -63,7 +67,6 @@ export default function GameDetail() {
     return game.assignments || [];
   }, [game, isInternal, internalTeamTab]);
 
-  // 다이아몬드 배치 지도
   const diamondAssignments = useMemo(() => {
     const map: Record<Position, string | null> = {} as Record<Position, string | null>;
     FIELD_POSITIONS.forEach(pos => {
@@ -157,7 +160,7 @@ export default function GameDetail() {
   };
 
   const selectedPlayers = useMemo(() => {
-    return selectedPlayerIds.map(id => players.find(p => p.id === id)!).filter(Boolean);
+    return selectedPlayerIds.map(id => players.find(p => p.id === id)!).filter(Boolean).sort((a, b) => a.number - b.number);
   }, [selectedPlayerIds, players]);
 
   const handleSaveRecord = () => {
@@ -264,7 +267,6 @@ export default function GameDetail() {
       {/* ===== 라인업 탭 ===== */}
       {tab === 'lineup' && (
         <div className="space-y-4">
-          {/* 청백전일 경우 청팀 / 백팀 라인업 선택 버튼 */}
           {isInternal && (
             <div className="flex gap-2">
               <button
@@ -394,7 +396,7 @@ export default function GameDetail() {
                           const calc = singleGameBattingCalc(stat);
                           return (
                             <tr key={stat.playerId}>
-                              <td>{p?.name ?? '?'}</td>
+                              <td>{p ? `#${p.number} ${p.name}` : '?'}</td>
                               <td>{stat.PA}</td><td>{stat.AB}</td><td>{stat.H}</td><td>{stat['2B']}</td><td>{stat['3B']}</td>
                               <td>{stat.HR}</td><td>{stat.RBI}</td><td>{stat.R}</td><td>{stat.BB}</td><td>{stat.SO}</td><td>{stat.SB}</td>
                               <td className="font-extrabold text-slate-900">{formatRate(calc.BA)}</td>
@@ -425,7 +427,7 @@ export default function GameDetail() {
                           const p = players.find(pl => pl.id === stat.playerId);
                           return (
                             <tr key={stat.playerId}>
-                              <td>{p?.name ?? '?'}</td>
+                              <td>{p ? `#${p.number} ${p.name}` : '?'}</td>
                               <td>{stat.W}</td><td>{stat.L}</td><td>{stat.SV}</td><td>{stat.IP}</td><td>{stat.H}</td>
                               <td>{stat.R}</td><td>{stat.ER}</td><td>{stat.BB}</td><td>{stat.SO}</td>
                               <td className="font-extrabold text-slate-900">{formatERA(calcERA(stat.ER, stat.IP))}</td>
@@ -490,9 +492,9 @@ export default function GameDetail() {
                   <div className="p-5">
                     {recordStep === 'select' && (
                       <div>
-                        <p className="text-xs text-slate-500 mb-3">경기에 출전한 선수들을 체크하세요. 투수가 지명타자(DH)나 타자로도 출전한 경우에도 체크 후 양쪽 성적을 입력할 수 있습니다.</p>
+                        <p className="text-xs text-slate-500 mb-3">경기에 출전한 선수들을 체크하세요. (배번순 정렬)</p>
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                          {players.map(player => {
+                          {sortedPlayersList.map(player => {
                             const isSelected = selectedPlayerIds.includes(player.id);
                             return (
                               <button
@@ -505,8 +507,8 @@ export default function GameDetail() {
                                 <div className={`w-5 h-5 rounded flex items-center justify-center shrink-0 ${isSelected ? 'bg-white text-black' : 'bg-slate-100'}`}>
                                   {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
                                 </div>
-                                <span className="text-sm truncate">{player.name}</span>
-                                <span className="text-xs opacity-60 ml-auto">#{player.number}</span>
+                                <span className="text-xs font-bold opacity-60">#{player.number}</span>
+                                <span className="text-sm truncate font-extrabold">{player.name}</span>
                               </button>
                             );
                           })}
@@ -524,8 +526,8 @@ export default function GameDetail() {
                         {selectedPlayers.map(player => (
                           <div key={`stat-${player.id}`} className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-4">
                             <div className="flex items-center gap-2 pb-2 border-b border-slate-200">
+                              <span className="font-bold text-xs bg-slate-900 text-white px-2 py-0.5 rounded">#{player.number}</span>
                               <span className="font-extrabold text-slate-900 text-base">{player.name}</span>
-                              <span className="text-xs text-slate-500 font-bold">#{player.number}</span>
                               <div className="flex gap-1 ml-auto">
                                 {player.positions?.map(pos => (
                                   <span key={pos} className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 text-slate-700">
@@ -537,7 +539,7 @@ export default function GameDetail() {
 
                             {/* 타격 기록 */}
                             <div>
-                              <h4 className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">⚾ 타격 기록 (지명타자 DH / 타자 출전 시 입력)</h4>
+                              <h4 className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">⚾ 타격 기록</h4>
                               <BattingStatsForm
                                 playerName={player.name}
                                 stats={battingData[player.id] || emptyBattingStats(player.id)}
@@ -547,7 +549,7 @@ export default function GameDetail() {
 
                             {/* 투구 기록 */}
                             <div className="pt-2 border-t border-slate-200">
-                              <h4 className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">🥎 투구 기록 (투수로 등판한 경우 입력)</h4>
+                              <h4 className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">🥎 투구 기록</h4>
                               <PitchingStatsForm
                                 playerName={player.name}
                                 stats={pitchingData[player.id] || emptyPitchingStats(player.id)}
@@ -578,7 +580,7 @@ export default function GameDetail() {
         </div>
       )}
 
-      {/* 선수 선택 모달 (라인업용: 투수 포함 모든 선수 선택 가능) */}
+      {/* 선수 선택 모달 (배번 오름차순 정렬) */}
       {showPlayerPicker && isAdmin && (
         <div className="modal-overlay" onClick={() => setShowPlayerPicker(null)}>
           <div className="modal-content p-5" onClick={e => e.stopPropagation()}>
@@ -591,7 +593,7 @@ export default function GameDetail() {
               </button>
             </div>
             <div className="space-y-1 max-h-80 overflow-y-auto">
-              {players.map(player => {
+              {sortedPlayersList.map(player => {
                 const alreadyAssigned = assignedPlayerIds.has(player.id);
                 const isCurrentPos = currentAssignments.find(
                   a => a.position === showPlayerPicker && a.playerId === player.id
@@ -612,7 +614,7 @@ export default function GameDetail() {
                     <div className={`w-10 h-10 rounded-lg flex items-center justify-center font-bold text-sm ${
                       isCurrentPos ? 'bg-white text-black' : 'bg-slate-200 text-slate-800'
                     }`}>
-                      {player.number}
+                      #{player.number}
                     </div>
                     <div>
                       <div className="font-bold text-sm">{player.name}</div>

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAppStore } from '../store';
 import { MAX_PLAYERS, POSITION_LABELS, ALL_POSITIONS, type Position } from '../types';
 import { Users, Plus, Pencil, Trash2, X, Hash, User, MapPin, RotateCcw, Check, Lock } from 'lucide-react';
@@ -12,6 +12,11 @@ export default function TeamRoster() {
     number: '',
     positions: ['BENCH'],
   });
+
+  // 등번호 오름차순 정렬
+  const sortedPlayers = useMemo(() => {
+    return [...players].sort((a, b) => a.number - b.number);
+  }, [players]);
 
   const resetForm = () => {
     setForm({ name: '', number: '', positions: ['BENCH'] });
@@ -91,7 +96,7 @@ export default function TeamRoster() {
       alert('로스터 초기화는 관리자 계정만 가능합니다.');
       return;
     }
-    if (confirm('로스터를 사진속 23명 실제 동아리원 데이터로 초기화하시겠습니까?')) {
+    if (confirm('로스터를 배번순 공식 23명 실제 동아리원 데이터로 초기화하시겠습니까?')) {
       resetToDemo();
     }
   };
@@ -105,13 +110,13 @@ export default function TeamRoster() {
             선수 로스터
           </h2>
           <p className="text-slate-500 text-sm mt-1">
-            {players.length} / {MAX_PLAYERS}명 등록됨 (멀티 포지션 지원)
+            {players.length} / {MAX_PLAYERS}명 등록됨 (배번 오름차순 정렬)
           </p>
         </div>
         {isAdmin ? (
           <div className="flex gap-2">
             <button onClick={handleResetRoster} className="btn-secondary text-xs">
-              <RotateCcw className="w-3.5 h-3.5" /> 실제 23명 로스터 초기화
+              <RotateCcw className="w-3.5 h-3.5" /> 배번순 로스터 초기화
             </button>
             <button
               onClick={() => { resetForm(); setShowForm(true); }}
@@ -210,9 +215,9 @@ export default function TeamRoster() {
         </div>
       )}
 
-      {/* 선수 목록 */}
+      {/* 선수 목록 (배번 오름차순 정렬) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {players.map((player, idx) => {
+        {sortedPlayers.map((player, idx) => {
           const positions = player.positions && player.positions.length > 0 ? player.positions : ['BENCH'];
           return (
             <div
@@ -221,7 +226,7 @@ export default function TeamRoster() {
               style={{ animationDelay: `${idx * 15}ms` }}
             >
               <div className="w-12 h-12 rounded-xl bg-slate-900 text-white font-extrabold text-lg flex items-center justify-center shrink-0 shadow-sm">
-                {player.number}
+                #{player.number}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="font-extrabold text-slate-900 text-base truncate">{player.name}</div>
@@ -265,7 +270,7 @@ export default function TeamRoster() {
           <p className="text-slate-600 font-medium">등록된 선수가 없습니다</p>
           {isAdmin && (
             <button onClick={handleResetRoster} className="btn-primary mt-4">
-              <RotateCcw className="w-4 h-4" /> 사진속 23명 로스터 로드
+              <RotateCcw className="w-4 h-4" /> 배번순 로스터 로드
             </button>
           )}
         </div>

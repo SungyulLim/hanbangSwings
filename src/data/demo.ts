@@ -1,30 +1,30 @@
-// ===== 데모 데이터 (26-2 선수단 공식 배번 적용) =====
+// ===== 데모 데이터 (배번 오름차순 정렬) =====
 import type { Player, Game } from '../types';
 
 export const demoPlayers: Player[] = [
+  { id: 'p07', name: '정회제', number: 2, positions: ['2B', 'SS'], createdAt: '2026-01-01' },
+  { id: 'p16', name: '이건욱', number: 3, positions: ['3B', 'SS'], createdAt: '2026-01-01' },
+  { id: 'p04', name: '김준혁', number: 4, positions: ['3B', '1B'], createdAt: '2026-01-01' },
+  { id: 'p21', name: '박준현', number: 6, positions: ['2B', '3B'], createdAt: '2026-01-01' },
+  { id: 'p15', name: '이민형', number: 12, positions: ['P', '1B', 'DH'], createdAt: '2026-01-01' },
+  { id: 'p08', name: '김세훈', number: 13, positions: ['1B', '3B'], createdAt: '2026-01-01' },
+  { id: 'p05', name: '강현승', number: 15, positions: ['CF', 'LF'], createdAt: '2026-01-01' },
+  { id: 'p03', name: '임성열', number: 16, positions: ['SS', '2B'], createdAt: '2026-01-01' },
+  { id: 'p17', name: '김필립', number: 17, positions: ['RF', 'LF'], createdAt: '2026-01-01' },
+  { id: 'p14', name: '서지호', number: 18, positions: ['C', 'DH'], createdAt: '2026-01-01' },
+  { id: 'p13', name: '김승현', number: 21, positions: ['2B', 'LF'], createdAt: '2026-01-01' },
+  { id: 'p19', name: '문예찬', number: 23, positions: ['LF', 'CF'], createdAt: '2026-01-01' },
+  { id: 'p09', name: '김찬호', number: 31, positions: ['LF', 'RF'], createdAt: '2026-01-01' },
+  { id: 'p18', name: '구도현', number: 33, positions: ['P', '2B', 'DH'], createdAt: '2026-01-01' },
+  { id: 'p23', name: '탁월한', number: 36, positions: ['DH', '1B'], createdAt: '2026-01-01' },
   { id: 'p01', name: '이준민', number: 39, positions: ['P', 'CF', 'DH'], createdAt: '2026-01-01' },
   { id: 'p02', name: '이정훈', number: 41, positions: ['C', '1B'], createdAt: '2026-01-01' },
-  { id: 'p03', name: '임성열', number: 16, positions: ['SS', '2B'], createdAt: '2026-01-01' },
-  { id: 'p04', name: '김준혁', number: 4, positions: ['3B', '1B'], createdAt: '2026-01-01' },
-  { id: 'p05', name: '강현승', number: 15, positions: ['CF', 'LF'], createdAt: '2026-01-01' },
-  { id: 'p06', name: '김도경', number: 91, positions: ['RF', 'P', 'DH'], createdAt: '2026-01-01' },
-  { id: 'p07', name: '정회제', number: 2, positions: ['2B', 'SS'], createdAt: '2026-01-01' },
-  { id: 'p08', name: '김세훈', number: 13, positions: ['1B', '3B'], createdAt: '2026-01-01' },
-  { id: 'p09', name: '김찬호', number: 31, positions: ['LF', 'RF'], createdAt: '2026-01-01' },
   { id: 'p10', name: '석권원', number: 42, positions: ['P', 'C', 'DH'], createdAt: '2026-01-01' },
   { id: 'p11', name: '유은택', number: 51, positions: ['SS', '3B'], createdAt: '2026-01-01' },
   { id: 'p12', name: '구본서', number: 52, positions: ['CF', 'P'], createdAt: '2026-01-01' },
-  { id: 'p13', name: '김승현', number: 21, positions: ['2B', 'LF'], createdAt: '2026-01-01' },
-  { id: 'p14', name: '서지호', number: 18, positions: ['C', 'DH'], createdAt: '2026-01-01' },
-  { id: 'p15', name: '이민형', number: 12, positions: ['P', '1B', 'DH'], createdAt: '2026-01-01' },
-  { id: 'p16', name: '이건욱', number: 3, positions: ['3B', 'SS'], createdAt: '2026-01-01' },
-  { id: 'p17', name: '김필립', number: 17, positions: ['RF', 'LF'], createdAt: '2026-01-01' },
-  { id: 'p18', name: '구도현', number: 33, positions: ['P', '2B', 'DH'], createdAt: '2026-01-01' },
-  { id: 'p19', name: '문예찬', number: 23, positions: ['LF', 'CF'], createdAt: '2026-01-01' },
   { id: 'p20', name: '박건우', number: 80, positions: ['1B', 'C'], createdAt: '2026-01-01' },
-  { id: 'p21', name: '박준현', number: 6, positions: ['2B', '3B'], createdAt: '2026-01-01' },
   { id: 'p22', name: '정우찬', number: 88, positions: ['P', 'CF', 'DH'], createdAt: '2026-01-01' },
-  { id: 'p23', name: '탁월한', number: 36, positions: ['DH', '1B'], createdAt: '2026-01-01' },
+  { id: 'p06', name: '김도경', number: 91, positions: ['RF', 'P', 'DH'], createdAt: '2026-01-01' },
 ];
 
 export const demoGames: Game[] = [
