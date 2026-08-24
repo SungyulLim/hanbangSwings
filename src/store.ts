@@ -1,9 +1,9 @@
-// ===== Zustand 스토어 (4월 12일 청백전 매치 반영 v8) =====
+// ===== Zustand 스토어 (학기별 리그 지원 v9) =====
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import type { Player, Game, PositionAssignment, SharedLineupData, BattingStats, PitchingStats, GameResult, GameType } from './types';
+import type { Player, Game, Season, PositionAssignment, SharedLineupData, BattingStats, PitchingStats, GameResult, GameType } from './types';
 import { MAX_PLAYERS } from './types';
-import { demoPlayers, demoGames } from './data/demo';
+import { demoPlayers, demoGames, demoSeasons } from './data/demo';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
@@ -12,6 +12,7 @@ function generateId(): string {
 interface AppState {
   players: Player[];
   games: Game[];
+  seasons: Season[];
   initialized: boolean;
   isAdmin: boolean;
 
@@ -24,8 +25,13 @@ interface AppState {
   updatePlayer: (id: string, data: Partial<Player>) => void;
   removePlayer: (id: string) => void;
 
+  // Season (League) actions
+  addSeason: (name: string, startDate: string, endDate: string) => string;
+  updateSeason: (id: string, data: Partial<Season>) => void;
+  removeSeason: (id: string) => void;
+
   // Game actions
-  addGame: (gameDate: string, opponent: string, gameType?: GameType) => string;
+  addGame: (gameDate: string, opponent: string, gameType?: GameType, seasonId?: string) => string;
   updateGame: (id: string, data: Partial<Game>) => void;
   removeGame: (id: string) => void;
   completeGame: (id: string, result: GameResult, scoreUs: number, scoreThem: number, battingStats: BattingStats[], pitchingStats: PitchingStats[]) => void;
@@ -46,6 +52,7 @@ export const useAppStore = create<AppState>()(
     (set, get) => ({
       players: [],
       games: [],
+      seasons: [],
       initialized: false,
       isAdmin: false,
 
@@ -81,7 +88,32 @@ export const useAppStore = create<AppState>()(
         set({ players: get().players.filter(p => p.id !== id) });
       },
 
-      addGame: (gameDate, opponent, gameType = 'external') => {
+      addSeason: (name, startDate, endDate) => {
+        const id = generateId();
+        const newSeason: Season = {
+          id,
+          name,
+          startDate,
+          endDate,
+          createdAt: new Date().toISOString(),
+        };
+        set({ seasons: [...get().seasons, newSeason] });
+        return id;
+      },
+
+      updateSeason: (id, data) => {
+        set({ seasons: get().seasons.map(s => s.id === id ? { ...s, ...data } : s) });
+      },
+
+      removeSeason: (id) => {
+        // 해당 리그에 속한 경기의 seasonId를 undefined로 초기화
+        set({
+          seasons: get().seasons.filter(s => s.id !== id),
+          games: get().games.map(g => g.seasonId === id ? { ...g, seasonId: undefined } : g),
+        });
+      },
+
+      addGame: (gameDate, opponent, gameType = 'external', seasonId) => {
         const id = generateId();
         const opponentName = gameType === 'internal' ? '한방 스윙스 청백전' : opponent;
         const newGame: Game = {
@@ -90,6 +122,7 @@ export const useAppStore = create<AppState>()(
           opponent: opponentName,
           gameType,
           status: 'upcoming',
+          seasonId,
           assignments: [],
           blueAssignments: [],
           whiteAssignments: [],
@@ -179,6 +212,7 @@ export const useAppStore = create<AppState>()(
           set({
             players: demoPlayers,
             games: demoGames,
+            seasons: demoSeasons,
             initialized: true,
           });
         }
@@ -188,11 +222,12 @@ export const useAppStore = create<AppState>()(
         set({
           players: demoPlayers,
           games: demoGames,
+          seasons: demoSeasons,
           initialized: true,
         });
       },
     }),
-    { name: 'hanbang-swings-store-v8' }
+    { name: 'hanbang-swings-store-v9' }
   )
 );
 

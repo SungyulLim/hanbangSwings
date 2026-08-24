@@ -1,4 +1,4 @@
-// ===== 한방 스윙스 - 핵심 타입 정의 (라인업 단일화 & 투수 DH 겸업 지원) =====
+// ===== 한방 스윙스 - 핵심 타입 정의 (라인업 단일화 & 투수 DH 겸업 지원, 학기별 리그 지원) =====
 
 export const MAX_PLAYERS = 35;
 
@@ -64,6 +64,15 @@ export type GameResult = 'W' | 'L' | 'D';
 export type GameStatus = 'upcoming' | 'completed';
 export type GameType = 'external' | 'internal'; // external: 대외 경기, internal: 청백전
 
+// 리그 (학기별 시즌)
+export interface Season {
+  id: string;
+  name: string;       // 예: "2026 봄 리그"
+  startDate: string;  // YYYY-MM-DD
+  endDate: string;    // YYYY-MM-DD
+  createdAt: string;
+}
+
 // 경기 (단일 라인업 & 청백전시 청/백 라인업 구조)
 export interface Game {
   id: string;
@@ -74,7 +83,8 @@ export interface Game {
   result?: GameResult;
   scoreUs?: number; // 우리팀 / 청팀 점수
   scoreThem?: number; // 상대팀 / 백팀 점수
-  
+  seasonId?: string; // 소속 리그 ID (없으면 미분류)
+
   // 경기의 라인업 (대외경기: 단일 라인업, 청백전: 청팀/백팀 라인업)
   assignments: PositionAssignment[]; // 대외경기용 타순 및 수비배치
   blueAssignments?: PositionAssignment[]; // 청백전 청팀

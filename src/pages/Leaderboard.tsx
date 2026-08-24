@@ -11,16 +11,23 @@ type SortConfig = {
 };
 
 export default function Leaderboard() {
-  const { players, games } = useAppStore();
+  const { players, games, seasons } = useAppStore();
   const [tab, setTab] = useState<'batting' | 'pitching'>('batting');
   const [search, setSearch] = useState('');
   const [qualifyingOnly, setQualifyingOnly] = useState(false);
+  const [selectedSeasonId, setSelectedSeasonId] = useState<string>('all'); // 'all' = 전체
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
   const [batSort, setBatSort] = useState<SortConfig>({ key: 'BA', direction: 'desc' });
   const [pitSort, setPitSort] = useState<SortConfig>({ key: 'ERA', direction: 'asc' });
 
-  const completedGames = useMemo(() => games.filter(g => g.status === 'completed'), [games]);
+  // 선택 리그에 따라 완료된 경기 필터링
+  const completedGames = useMemo(() => {
+    const all = games.filter(g => g.status === 'completed');
+    if (selectedSeasonId === 'all') return all;
+    return all.filter(g => g.seasonId === selectedSeasonId);
+  }, [games, selectedSeasonId]);
+
   const teamGames = completedGames.length;
   const qualPA = teamGames * 1.5;
   const qualIP = teamGames * 1;
@@ -72,12 +79,12 @@ export default function Leaderboard() {
     result.sort((a, b) => {
       const aVal = a.stats[pitSort.key as keyof typeof a.stats] as number;
       const bVal = b.stats[pitSort.key as keyof typeof b.stats] as number;
-      
+
       if (pitSort.key === 'ERA') {
         if (a.stats.IP === 0) return 1;
         if (b.stats.IP === 0) return -1;
       }
-      
+
       return pitSort.direction === 'asc' ? aVal - bVal : bVal - aVal;
     });
 
@@ -95,18 +102,23 @@ export default function Leaderboard() {
     const defaultDir = key === 'ERA' ? 'asc' : 'desc';
     setPitSort(prev => ({
       key,
-      direction: prev.key === key && prev.direction === defaultDir 
-        ? (defaultDir === 'asc' ? 'desc' : 'asc') 
+      direction: prev.key === key && prev.direction === defaultDir
+        ? (defaultDir === 'asc' ? 'desc' : 'asc')
         : defaultDir
     }));
   };
 
   const SortIcon = ({ sortConfig, sortKey }: { sortConfig: SortConfig, sortKey: string }) => {
     if (sortConfig.key !== sortKey) return null;
-    return sortConfig.direction === 'asc' 
-      ? <ChevronUp className="w-3 h-3 inline ml-1" /> 
+    return sortConfig.direction === 'asc'
+      ? <ChevronUp className="w-3 h-3 inline ml-1" />
       : <ChevronDown className="w-3 h-3 inline ml-1" />;
   };
+
+  // 현재 선택된 리그 이름
+  const selectedSeasonLabel = selectedSeasonId === 'all'
+    ? '전체 통산'
+    : seasons.find(s => s.id === selectedSeasonId)?.name ?? '전체 통산';
 
   return (
     <div className="space-y-6">
@@ -114,10 +126,43 @@ export default function Leaderboard() {
         <div>
           <h2 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
             <Trophy className="w-6 h-6 text-amber-500" />
-            리더보드 & 기록실
+            리더보드 &amp; 기록실
           </h2>
-          <p className="text-slate-500 text-sm mt-1">누적 순위표 및 통산 성적</p>
+          <p className="text-slate-500 text-sm mt-1">
+            {selectedSeasonLabel} 순위표 및 성적
+          </p>
         </div>
+      </div>
+
+      {/* 리그 셀렉터 */}
+      <div className="flex gap-2 flex-wrap">
+        <button
+          onClick={() => setSelectedSeasonId('all')}
+          className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all flex items-center gap-1.5 ${
+            selectedSeasonId === 'all'
+              ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+              : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
+          }`}
+        >
+          전체 통산
+        </button>
+        {seasons
+          .slice()
+          .sort((a, b) => b.startDate.localeCompare(a.startDate))
+          .map(season => (
+            <button
+              key={season.id}
+              onClick={() => setSelectedSeasonId(season.id)}
+              className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all flex items-center gap-1.5 ${
+                selectedSeasonId === season.id
+                  ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                  : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300'
+              }`}
+            >
+              <Trophy className="w-3.5 h-3.5" />
+              {season.name}
+            </button>
+          ))}
       </div>
 
       {/* 컨트롤 패널 */}
@@ -155,8 +200,8 @@ export default function Leaderboard() {
           <button
             onClick={() => setQualifyingOnly(!qualifyingOnly)}
             className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border transition-all ${
-              qualifyingOnly 
-                ? 'bg-slate-900 text-white border-slate-900 shadow-sm' 
+              qualifyingOnly
+                ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
                 : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
             }`}
             title={`규정 ${tab === 'batting' ? '타석' : '이닝'} (${tab === 'batting' ? qualPA : qualIP}) 이상만 보기`}
@@ -167,8 +212,18 @@ export default function Leaderboard() {
         </div>
       </div>
 
-      {/* 타자 순위표 (한글 용어 헤더) */}
-      {tab === 'batting' && (
+      {/* 경기 없음 안내 */}
+      {completedGames.length === 0 && (
+        <div className="glass-card p-8 text-center">
+          <Trophy className="w-10 h-10 text-slate-300 mx-auto mb-3" />
+          <p className="text-slate-500 font-medium text-sm">
+            {selectedSeasonId === 'all' ? '완료된 경기가 없습니다.' : `${selectedSeasonLabel}에 완료된 경기가 없습니다.`}
+          </p>
+        </div>
+      )}
+
+      {/* 타자 순위표 */}
+      {tab === 'batting' && completedGames.length > 0 && (
         <div className="glass-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="stats-table">
@@ -232,8 +287,8 @@ export default function Leaderboard() {
         </div>
       )}
 
-      {/* 투수 순위표 (한글 용어 헤더) */}
-      {tab === 'pitching' && (
+      {/* 투수 순위표 */}
+      {tab === 'pitching' && completedGames.length > 0 && (
         <div className="glass-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="stats-table">

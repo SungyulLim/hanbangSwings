@@ -1,5 +1,5 @@
 // ===== 데모 데이터 (4월 12일 청백전 실제 완료 기록 포함) =====
-import type { Player, Game } from '../types';
+import type { Player, Game, Season } from '../types';
 
 export const demoPlayers: Player[] = [
   { id: 'p07', name: '정회제', number: 2, positions: ['2B', 'SS'], createdAt: '2026-01-01' },
@@ -27,6 +27,16 @@ export const demoPlayers: Player[] = [
   { id: 'p06', name: '김도경', number: 91, positions: ['SS'], createdAt: '2026-01-01' },
 ];
 
+export const demoSeasons: Season[] = [
+  {
+    id: 'season-2026-spring',
+    name: '2026 봄 리그',
+    startDate: '2026-04-01',
+    endDate: '2026-06-30',
+    createdAt: '2026-04-01',
+  },
+];
+
 export const demoGames: Game[] = [
   {
     id: 'g04',
@@ -37,6 +47,7 @@ export const demoGames: Game[] = [
     result: 'W',
     scoreUs: 10,
     scoreThem: 2,
+    seasonId: 'season-2026-spring',
     createdAt: '2026-04-12',
     assignments: [],
     blueAssignments: [
@@ -90,6 +101,7 @@ export const demoGames: Game[] = [
     result: 'W',
     scoreUs: 7,
     scoreThem: 3,
+    seasonId: 'season-2026-spring',
     createdAt: '2026-04-05',
     assignments: [
       { position: 'CF', playerId: 'p01', battingOrder: 1 },
@@ -127,6 +139,7 @@ export const demoGames: Game[] = [
     result: 'W',
     scoreUs: 5,
     scoreThem: 4,
+    seasonId: 'season-2026-spring',
     createdAt: '2026-05-15',
     assignments: [],
     blueAssignments: [
