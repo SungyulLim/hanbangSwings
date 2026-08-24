@@ -1,4 +1,4 @@
-// ===== Zustand 스토어 (학기별 리그 지원 v9) =====
+// ===== Zustand 스토어 (데이터 영구 보존 & 과거 버전 자동 마이그레이션 & 백업/복원 지원) =====
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Player, Game, Season, PositionAssignment, SharedLineupData, BattingStats, PitchingStats, GameResult, GameType } from './types';
@@ -8,6 +8,20 @@ import { demoPlayers, demoGames, demoSeasons } from './data/demo';
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
 }
+
+// 과거 저장소 키 목록 (자동 데이터 복구용)
+const LEGACY_STORAGE_KEYS = [
+  'hanbang-swings-store-v9',
+  'hanbang-swings-store-v8',
+  'hanbang-swings-store-v7',
+  'hanbang-swings-store-v6',
+  'hanbang-swings-store-v5',
+  'hanbang-swings-store-v4',
+  'hanbang-swings-store-v3',
+  'hanbang-swings-store-v2',
+  'hanbang-swings-store-v1',
+  'hanbang-swings-store',
+];
 
 interface AppState {
   players: Player[];
@@ -41,6 +55,10 @@ interface AppState {
 
   // Sharing
   encodeLineupForShare: (gameId: string, targetTeam?: 'main' | 'blue' | 'white') => string | null;
+
+  // Data Export / Import (전체 백업 및 복원)
+  exportData: () => string;
+  importData: (jsonStr: string) => boolean;
 
   // Init & Reset
   initializeWithDemo: () => void;
@@ -205,17 +223,79 @@ export const useAppStore = create<AppState>()(
         }
       },
 
-      initializeWithDemo: () => {
-        const { initialized, games } = get();
-        const hasApril12Game = games.some(g => g.gameDate === '2026-04-12');
-        if (!initialized || !hasApril12Game) {
+      exportData: () => {
+        const { players, games, seasons } = get();
+        const exportObj = {
+          title: '한방 스윙스 데이터 백업',
+          exportDate: new Date().toISOString(),
+          version: 1,
+          players,
+          games,
+          seasons,
+        };
+        return JSON.stringify(exportObj, null, 2);
+      },
+
+      importData: (jsonStr: string) => {
+        try {
+          const data = JSON.parse(jsonStr);
+          if (!data.players || !Array.isArray(data.players)) {
+            return false;
+          }
           set({
-            players: demoPlayers,
-            games: demoGames,
-            seasons: demoSeasons,
+            players: data.players,
+            games: Array.isArray(data.games) ? data.games : [],
+            seasons: Array.isArray(data.seasons) && data.seasons.length > 0 ? data.seasons : demoSeasons,
             initialized: true,
           });
+          return true;
+        } catch {
+          return false;
         }
+      },
+
+      initializeWithDemo: () => {
+        const { initialized, players, games, seasons } = get();
+
+        // 1. 이미 스토어에 데이터가 존재하면 절대 덮어쓰지 않고 기존 데이터 유지!
+        if (initialized && (players.length > 0 || games.length > 0)) {
+          if (seasons.length === 0) {
+            set({ seasons: demoSeasons });
+          }
+          return;
+        }
+
+        // 2. 현재 스토어가 비어있다면, 과거 버전의 localStorage 키에서 기존 사용자 데이터 복구 시도
+        if (typeof window !== 'undefined') {
+          for (const key of LEGACY_STORAGE_KEYS) {
+            try {
+              const raw = localStorage.getItem(key);
+              if (raw) {
+                const parsed = JSON.parse(raw);
+                const state = parsed.state || parsed;
+                if (state && Array.isArray(state.players) && state.players.length > 0) {
+                  set({
+                    players: state.players,
+                    games: Array.isArray(state.games) ? state.games : [],
+                    seasons: Array.isArray(state.seasons) && state.seasons.length > 0 ? state.seasons : demoSeasons,
+                    initialized: true,
+                  });
+                  return;
+                }
+              }
+            } catch {
+              // ignore parse errors
+            }
+          }
+        }
+
+        // 3. 브라우저에 저장된 이전 데이터가 전혀 없는 최초 방문자일 때만 데모 데이터 로드
+        set({
+          players: demoPlayers,
+          games: demoGames,
+          seasons: demoSeasons,
+          initialized: true,
+        });
       },
 
       resetToDemo: () => {
@@ -227,7 +307,7 @@ export const useAppStore = create<AppState>()(
         });
       },
     }),
-    { name: 'hanbang-swings-store-v9' }
+    { name: 'hanbang-swings-main-storage' }
   )
 );
 
