@@ -134,7 +134,7 @@ export default function GameDetail() {
     newAssignments.push({
       position,
       playerId,
-      battingOrder: position === 'BENCH' ? 0 : maxOrder + 1,
+      battingOrder: position === 'MANAGER' ? 0 : maxOrder + 1,
     });
 
     const targetTeam = isInternal ? internalTeamTab : 'main';
@@ -463,7 +463,7 @@ export default function GameDetail() {
               />
               {isAdmin && isUpcoming && (
                 <div className="mt-4 flex gap-2 flex-wrap justify-center">
-                  {(['DH', 'BENCH'] as Position[]).map(pos => {
+                  {(['DH', 'MANAGER'] as Position[]).map(pos => {
                     const existing = currentAssignments.find(a => a.position === pos);
                     return (
                       <button

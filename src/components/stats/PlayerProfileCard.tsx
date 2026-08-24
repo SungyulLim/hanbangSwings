@@ -46,7 +46,7 @@ export default function PlayerProfileCard({ player, games, onClose }: Props) {
   }, [playerGames, player.id]);
 
   const isPitcher = pitStats.G > 0;
-  const positions = player.positions && player.positions.length > 0 ? player.positions : ['BENCH' as Position];
+  const positions = player.positions && player.positions.length > 0 ? player.positions : ['MANAGER' as Position];
 
   return (
     <div className="modal-overlay" onClick={onClose}>

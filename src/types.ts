@@ -3,15 +3,15 @@
 export const MAX_PLAYERS = 35;
 
 // 수비 포지션
-export type Position = 'P' | 'C' | '1B' | '2B' | '3B' | 'SS' | 'LF' | 'CF' | 'RF' | 'DH' | 'BENCH';
+export type Position = 'P' | 'C' | '1B' | '2B' | '3B' | 'SS' | 'LF' | 'CF' | 'RF' | 'DH' | 'MANAGER';
 
 export const FIELD_POSITIONS: Position[] = ['P', 'C', '1B', '2B', '3B', 'SS', 'LF', 'CF', 'RF'];
-export const ALL_POSITIONS: Position[] = [...FIELD_POSITIONS, 'DH', 'BENCH'];
+export const ALL_POSITIONS: Position[] = [...FIELD_POSITIONS, 'DH', 'MANAGER'];
 
 export const POSITION_LABELS: Record<Position, string> = {
   P: '투수', C: '포수', '1B': '1루수', '2B': '2루수', '3B': '3루수',
   SS: '유격수', LF: '좌익수', CF: '중견수', RF: '우익수',
-  DH: '지명타자', BENCH: '후보',
+  DH: '지명타자', MANAGER: '매니저',
 };
 
 // 선수 (멀티 포지션 지원)

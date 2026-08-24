@@ -10,7 +10,7 @@ export default function TeamRoster() {
   const [form, setForm] = useState<{ name: string; number: string; positions: Position[] }>({
     name: '',
     number: '',
-    positions: ['BENCH'],
+    positions: [],
   });
 
   // 등번호 오름차순 정렬
@@ -19,7 +19,7 @@ export default function TeamRoster() {
   }, [players]);
 
   const resetForm = () => {
-    setForm({ name: '', number: '', positions: ['BENCH'] });
+    setForm({ name: '', number: '', positions: [] });
     setEditId(null);
     setShowForm(false);
   };
@@ -49,13 +49,13 @@ export default function TeamRoster() {
       updatePlayer(editId, {
         name: form.name.trim(),
         number: parseInt(form.number, 10),
-        positions: form.positions.length > 0 ? form.positions : ['BENCH'],
+        positions: form.positions.length > 0 ? form.positions : ['MANAGER'],
       });
     } else {
       const success = addPlayer({
         name: form.name.trim(),
         number: parseInt(form.number, 10),
-        positions: form.positions.length > 0 ? form.positions : ['BENCH'],
+        positions: form.positions.length > 0 ? form.positions : ['MANAGER'],
       });
       if (!success) {
         alert(`선수는 최대 ${MAX_PLAYERS}명까지 등록 가능합니다.`);
@@ -75,7 +75,7 @@ export default function TeamRoster() {
     setForm({
       name: p.name,
       number: String(p.number),
-      positions: p.positions && p.positions.length > 0 ? p.positions : ['BENCH'],
+      positions: p.positions && p.positions.length > 0 ? p.positions : ['MANAGER'],
     });
     setEditId(id);
     setShowForm(true);
@@ -218,7 +218,7 @@ export default function TeamRoster() {
       {/* 선수 목록 (배번 오름차순 정렬) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
         {sortedPlayers.map((player, idx) => {
-          const positions = player.positions && player.positions.length > 0 ? player.positions : ['BENCH'];
+          const positions = player.positions && player.positions.length > 0 ? player.positions : ['MANAGER'];
           return (
             <div
               key={player.id}
