@@ -371,21 +371,53 @@ export default function Games() {
               )}
             </div>
 
-            {/* 리그 선택 */}
+            {/* 리그 선택 — 카드 버튼 */}
             <div>
-              <label className="text-xs text-slate-500 mb-1 block font-medium flex items-center gap-1">
-                <Trophy className="w-3 h-3 text-amber-500" /> 소속 리그 (선택)
+              <label className="text-xs text-slate-500 mb-2 block font-medium flex items-center gap-1">
+                <Trophy className="w-3 h-3 text-amber-500" /> 소속 리그 선택
               </label>
-              <select
-                className="input-field"
-                value={selectedSeasonId}
-                onChange={e => setSelectedSeasonId(e.target.value)}
-              >
-                <option value="">미분류 (리그 없음)</option>
-                {seasons.map(s => (
-                  <option key={s.id} value={s.id}>{s.name} ({s.startDate} ~ {s.endDate})</option>
-                ))}
-              </select>
+              {seasons.length === 0 ? (
+                <div className="p-3 rounded-xl border border-dashed border-slate-300 text-center text-xs text-slate-400">
+                  리그가 없습니다. 상단 '리그 관리'에서 먼저 리그를 생성하세요.
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {/* 미분류 */}
+                  <button
+                    type="button"
+                    onClick={() => setSelectedSeasonId('')}
+                    className={`px-3 py-2 rounded-xl border text-sm font-bold transition-all flex items-center gap-1.5 ${
+                      selectedSeasonId === ''
+                        ? 'bg-slate-700 text-white border-slate-700 shadow-sm'
+                        : 'bg-white text-slate-500 border-slate-200 hover:border-slate-400'
+                    }`}
+                  >
+                    미분류
+                  </button>
+                  {/* 리그 카드 */}
+                  {seasons
+                    .slice()
+                    .sort((a, b) => b.startDate.localeCompare(a.startDate))
+                    .map(s => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => setSelectedSeasonId(s.id)}
+                        className={`px-3 py-2 rounded-xl border text-sm font-bold transition-all flex items-center gap-1.5 ${
+                          selectedSeasonId === s.id
+                            ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                            : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:text-amber-700'
+                        }`}
+                      >
+                        <Trophy className="w-3.5 h-3.5" />
+                        {s.name}
+                        <span className={`text-[10px] font-normal ${selectedSeasonId === s.id ? 'text-amber-100' : 'text-slate-400'}`}>
+                          {s.startDate.substring(0, 7)} ~ {s.endDate.substring(0, 7)}
+                        </span>
+                      </button>
+                    ))}
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-2 pt-2">

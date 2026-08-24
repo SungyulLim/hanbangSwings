@@ -3,7 +3,7 @@ import { useAppStore } from '../store';
 import { aggregateBattingStats, aggregatePitchingStats, formatRate, formatERA } from '../utils/stats';
 import type { Player, Game } from '../types';
 import PlayerProfileCard from '../components/stats/PlayerProfileCard';
-import { Trophy, ChevronDown, ChevronUp, Search, Filter } from 'lucide-react';
+import { Trophy, ChevronDown, ChevronUp, Search, Filter, Layers, X } from 'lucide-react';
 
 type SortConfig = {
   key: string;
@@ -15,22 +15,45 @@ export default function Leaderboard() {
   const [tab, setTab] = useState<'batting' | 'pitching'>('batting');
   const [search, setSearch] = useState('');
   const [qualifyingOnly, setQualifyingOnly] = useState(false);
-  const [selectedSeasonId, setSelectedSeasonId] = useState<string>('all'); // 'all' = 전체
+
+  // 'all' | Set<seasonId>
+  // 'all' 모드: 전체 통산
+  // Set 모드: 선택된 리그들 합산
+  const [mode, setMode] = useState<'all' | 'custom'>('all');
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
 
   const [batSort, setBatSort] = useState<SortConfig>({ key: 'BA', direction: 'desc' });
   const [pitSort, setPitSort] = useState<SortConfig>({ key: 'ERA', direction: 'asc' });
 
-  // 선택 리그에 따라 완료된 경기 필터링
+  // 리그 토글
+  const toggleSeason = (id: string) => {
+    setMode('custom');
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const setAll = () => {
+    setMode('all');
+    setSelectedIds(new Set());
+  };
+
+  // 현재 선택 기준으로 완료된 경기 필터링
   const completedGames = useMemo(() => {
     const all = games.filter(g => g.status === 'completed');
-    if (selectedSeasonId === 'all') return all;
-    return all.filter(g => g.seasonId === selectedSeasonId);
-  }, [games, selectedSeasonId]);
+    if (mode === 'all') return all;
+    if (selectedIds.size === 0) return [];
+    return all.filter(g => g.seasonId && selectedIds.has(g.seasonId));
+  }, [games, mode, selectedIds]);
 
   const teamGames = completedGames.length;
-  const qualPA = teamGames * 1.5;
-  const qualIP = teamGames * 1;
+  const qualPA = Math.max(1, teamGames * 1.5);
+  const qualIP = Math.max(1, teamGames * 1);
 
   // 데이터 집계
   const aggregatedBatting = useMemo(() => {
@@ -48,54 +71,35 @@ export default function Leaderboard() {
   // 필터 및 정렬 (타자)
   const displayBatting = useMemo(() => {
     let result = [...aggregatedBatting];
-
-    if (search) {
-      result = result.filter(r => r.player.name.includes(search));
-    }
-    if (qualifyingOnly) {
-      result = result.filter(r => r.stats.PA >= qualPA);
-    }
-
+    if (search) result = result.filter(r => r.player.name.includes(search));
+    if (qualifyingOnly) result = result.filter(r => r.stats.PA >= qualPA);
     result.sort((a, b) => {
       const aVal = a.stats[batSort.key as keyof typeof a.stats] as number;
       const bVal = b.stats[batSort.key as keyof typeof b.stats] as number;
       return batSort.direction === 'asc' ? aVal - bVal : bVal - aVal;
     });
-
     return result;
   }, [aggregatedBatting, search, qualifyingOnly, batSort, qualPA]);
 
   // 필터 및 정렬 (투수)
   const displayPitching = useMemo(() => {
     let result = [...aggregatedPitching];
-
-    if (search) {
-      result = result.filter(r => r.player.name.includes(search));
-    }
-    if (qualifyingOnly) {
-      result = result.filter(r => r.stats.IP >= qualIP);
-    }
-
+    if (search) result = result.filter(r => r.player.name.includes(search));
+    if (qualifyingOnly) result = result.filter(r => r.stats.IP >= qualIP);
     result.sort((a, b) => {
       const aVal = a.stats[pitSort.key as keyof typeof a.stats] as number;
       const bVal = b.stats[pitSort.key as keyof typeof b.stats] as number;
-
       if (pitSort.key === 'ERA') {
         if (a.stats.IP === 0) return 1;
         if (b.stats.IP === 0) return -1;
       }
-
       return pitSort.direction === 'asc' ? aVal - bVal : bVal - aVal;
     });
-
     return result;
   }, [aggregatedPitching, search, qualifyingOnly, pitSort, qualIP]);
 
   const handleBatSort = (key: string) => {
-    setBatSort(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc'
-    }));
+    setBatSort(prev => ({ key, direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc' }));
   };
 
   const handlePitSort = (key: string) => {
@@ -108,61 +112,123 @@ export default function Leaderboard() {
     }));
   };
 
-  const SortIcon = ({ sortConfig, sortKey }: { sortConfig: SortConfig, sortKey: string }) => {
+  const SortIcon = ({ sortConfig, sortKey }: { sortConfig: SortConfig; sortKey: string }) => {
     if (sortConfig.key !== sortKey) return null;
     return sortConfig.direction === 'asc'
       ? <ChevronUp className="w-3 h-3 inline ml-1" />
       : <ChevronDown className="w-3 h-3 inline ml-1" />;
   };
 
-  // 현재 선택된 리그 이름
-  const selectedSeasonLabel = selectedSeasonId === 'all'
-    ? '전체 통산'
-    : seasons.find(s => s.id === selectedSeasonId)?.name ?? '전체 통산';
+  // 헤더 레이블
+  const headerLabel = useMemo(() => {
+    if (mode === 'all') return '전체 통산';
+    if (selectedIds.size === 0) return '리그를 선택하세요';
+    if (selectedIds.size === 1) {
+      const id = [...selectedIds][0];
+      return seasons.find(s => s.id === id)?.name ?? '선택된 리그';
+    }
+    return `${selectedIds.size}개 리그 합산`;
+  }, [mode, selectedIds, seasons]);
+
+  const sortedSeasons = useMemo(
+    () => [...seasons].sort((a, b) => b.startDate.localeCompare(a.startDate)),
+    [seasons]
+  );
 
   return (
     <div className="space-y-6">
+      {/* 헤더 */}
       <div className="flex items-center justify-between flex-wrap gap-4">
         <div>
           <h2 className="text-2xl font-extrabold text-slate-900 flex items-center gap-2">
             <Trophy className="w-6 h-6 text-amber-500" />
             리더보드 &amp; 기록실
           </h2>
-          <p className="text-slate-500 text-sm mt-1">
-            {selectedSeasonLabel} 순위표 및 성적
+          <p className="text-slate-500 text-sm mt-1 flex items-center gap-1.5">
+            {mode === 'custom' && selectedIds.size > 1 && (
+              <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-800 text-xs px-2 py-0.5 rounded-full font-bold">
+                <Layers className="w-3 h-3" /> 합산 모드
+              </span>
+            )}
+            {headerLabel}
           </p>
         </div>
       </div>
 
       {/* 리그 셀렉터 */}
-      <div className="flex gap-2 flex-wrap">
-        <button
-          onClick={() => setSelectedSeasonId('all')}
-          className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all flex items-center gap-1.5 ${
-            selectedSeasonId === 'all'
-              ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
-              : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
-          }`}
-        >
-          전체 통산
-        </button>
-        {seasons
-          .slice()
-          .sort((a, b) => b.startDate.localeCompare(a.startDate))
-          .map(season => (
-            <button
-              key={season.id}
-              onClick={() => setSelectedSeasonId(season.id)}
-              className={`px-4 py-2 rounded-xl text-sm font-bold border transition-all flex items-center gap-1.5 ${
-                selectedSeasonId === season.id
-                  ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
-                  : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300'
-              }`}
-            >
-              <Trophy className="w-3.5 h-3.5" />
-              {season.name}
-            </button>
-          ))}
+      <div className="glass-card p-4 space-y-3">
+        <p className="text-xs text-slate-500 font-bold flex items-center gap-1">
+          <Trophy className="w-3.5 h-3.5 text-amber-500" />
+          리그 선택
+          {mode === 'custom' && selectedIds.size > 0 && (
+            <span className="ml-1 text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+              {selectedIds.size}개 선택됨 · 여러 개 선택 시 합산
+            </span>
+          )}
+        </p>
+
+        <div className="flex flex-wrap gap-2">
+          {/* 전체 통산 버튼 */}
+          <button
+            onClick={setAll}
+            className={`px-4 py-2 rounded-xl border text-sm font-bold transition-all flex items-center gap-1.5 ${
+              mode === 'all'
+                ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
+                : 'bg-white text-slate-600 border-slate-200 hover:border-slate-400'
+            }`}
+          >
+            전체 통산
+          </button>
+
+          {sortedSeasons.map(season => {
+            const isSelected = mode === 'custom' && selectedIds.has(season.id);
+            const gamesInSeason = games.filter(g => g.status === 'completed' && g.seasonId === season.id).length;
+            return (
+              <button
+                key={season.id}
+                onClick={() => toggleSeason(season.id)}
+                className={`px-4 py-2 rounded-xl border text-sm font-bold transition-all flex items-center gap-2 group ${
+                  isSelected
+                    ? 'bg-amber-500 text-white border-amber-500 shadow-sm'
+                    : 'bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:bg-amber-50'
+                }`}
+              >
+                <Trophy className={`w-3.5 h-3.5 ${isSelected ? 'text-white' : 'text-amber-400 group-hover:text-amber-500'}`} />
+                <span>{season.name}</span>
+                <span className={`text-[11px] font-normal ${isSelected ? 'text-amber-100' : 'text-slate-400'}`}>
+                  {gamesInSeason}경기
+                </span>
+                {isSelected && (
+                  <span className="w-4 h-4 rounded-full bg-white/30 flex items-center justify-center">
+                    <X className="w-2.5 h-2.5 text-white" />
+                  </span>
+                )}
+              </button>
+            );
+          })}
+
+          {seasons.length === 0 && (
+            <span className="text-xs text-slate-400 py-2">경기 페이지에서 리그를 먼저 생성하세요.</span>
+          )}
+        </div>
+
+        {/* 합산 중인 리그 배지 */}
+        {mode === 'custom' && selectedIds.size > 1 && (
+          <div className="flex flex-wrap gap-1.5 pt-1 border-t border-slate-100">
+            <span className="text-xs text-slate-400 self-center">합산 중:</span>
+            {[...selectedIds].map(id => {
+              const s = seasons.find(x => x.id === id);
+              return s ? (
+                <span key={id} className="inline-flex items-center gap-1 bg-amber-50 border border-amber-200 text-amber-800 text-xs px-2 py-0.5 rounded-full font-bold">
+                  {s.name}
+                  <button onClick={() => toggleSeason(id)} className="hover:text-red-600 transition-colors">
+                    <X className="w-2.5 h-2.5" />
+                  </button>
+                </span>
+              ) : null;
+            })}
+          </div>
+        )}
       </div>
 
       {/* 컨트롤 패널 */}
@@ -204,7 +270,7 @@ export default function Leaderboard() {
                 ? 'bg-slate-900 text-white border-slate-900 shadow-sm'
                 : 'bg-white text-slate-600 border-slate-200 hover:border-slate-300'
             }`}
-            title={`규정 ${tab === 'batting' ? '타석' : '이닝'} (${tab === 'batting' ? qualPA : qualIP}) 이상만 보기`}
+            title={`규정 ${tab === 'batting' ? '타석' : '이닝'} (${tab === 'batting' ? qualPA.toFixed(1) : qualIP.toFixed(1)}) 이상만 보기`}
           >
             <Filter className="w-3.5 h-3.5" />
             <span>규정 {tab === 'batting' ? '타석' : '이닝'}</span>
@@ -212,18 +278,20 @@ export default function Leaderboard() {
         </div>
       </div>
 
-      {/* 경기 없음 안내 */}
-      {completedGames.length === 0 && (
+      {/* 경기 없음 / 리그 미선택 안내 */}
+      {(completedGames.length === 0 || (mode === 'custom' && selectedIds.size === 0)) && (
         <div className="glass-card p-8 text-center">
           <Trophy className="w-10 h-10 text-slate-300 mx-auto mb-3" />
           <p className="text-slate-500 font-medium text-sm">
-            {selectedSeasonId === 'all' ? '완료된 경기가 없습니다.' : `${selectedSeasonLabel}에 완료된 경기가 없습니다.`}
+            {mode === 'custom' && selectedIds.size === 0
+              ? '위에서 리그를 하나 이상 선택하세요.'
+              : `선택한 리그에 완료된 경기가 없습니다.`}
           </p>
         </div>
       )}
 
       {/* 타자 순위표 */}
-      {tab === 'batting' && completedGames.length > 0 && (
+      {tab === 'batting' && completedGames.length > 0 && (mode === 'all' || selectedIds.size > 0) && (
         <div className="glass-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="stats-table">
@@ -288,7 +356,7 @@ export default function Leaderboard() {
       )}
 
       {/* 투수 순위표 */}
-      {tab === 'pitching' && completedGames.length > 0 && (
+      {tab === 'pitching' && completedGames.length > 0 && (mode === 'all' || selectedIds.size > 0) && (
         <div className="glass-card overflow-hidden">
           <div className="overflow-x-auto">
             <table className="stats-table">
