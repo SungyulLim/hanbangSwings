@@ -14,7 +14,8 @@ import { downloadGameRecordTemplate, parseGameRecordExcel, type ParsedExcelResul
 import {
   ArrowLeft, Share2, Copy, Check, X, Target,
   ClipboardList, Calendar, ShieldAlert, Trash2, Lock, Search, UserPlus,
-  FileSpreadsheet, Upload, Download, Sparkles, AlertCircle
+  FileSpreadsheet, Upload, Download, Sparkles, AlertCircle, Pencil, RotateCcw,
+  Trophy, Edit3
 } from 'lucide-react';
 
 type Tab = 'lineup' | 'record';
@@ -23,8 +24,8 @@ export default function GameDetail() {
   const { gameId } = useParams<{ gameId: string }>();
   const navigate = useNavigate();
   const {
-    players, games, isAdmin,
-    updateGameAssignments, completeGame, removeGame, encodeLineupForShare,
+    players, games, seasons, isAdmin,
+    updateGameAssignments, updateGame, completeGame, removeGame, encodeLineupForShare,
   } = useAppStore();
 
   const game = games.find(g => g.id === gameId);
@@ -37,7 +38,8 @@ export default function GameDetail() {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
-  // 경기 기록 입력 상태
+  // 경기 기록 입력/수정 상태
+  const [isEditingRecord, setIsEditingRecord] = useState(false);
   const [result, setResult] = useState<GameResult>('W');
   const [scoreUs, setScoreUs] = useState('');
   const [scoreThem, setScoreThem] = useState('');
@@ -45,6 +47,12 @@ export default function GameDetail() {
   const [battingData, setBattingData] = useState<Record<string, BattingStats>>({});
   const [pitchingData, setPitchingData] = useState<Record<string, PitchingStats>>({});
   const [recordStep, setRecordStep] = useState<'select' | 'stats'>('select');
+
+  // 경기 기본 정보 수정 모달 상태
+  const [showEditGameInfo, setShowEditGameInfo] = useState(false);
+  const [editGameDate, setEditGameDate] = useState('');
+  const [editOpponent, setEditOpponent] = useState('');
+  const [editSeasonId, setEditSeasonId] = useState('');
 
   // 엑셀 관련 상태
   const [excelModalData, setExcelModalData] = useState<ParsedExcelResult | null>(null);
@@ -67,6 +75,7 @@ export default function GameDetail() {
   }
 
   const isInternal = game.gameType === 'internal';
+  const currentSeason = seasons.find(s => s.id === game.seasonId);
 
   const currentAssignments = useMemo(() => {
     if (isInternal) {
@@ -107,26 +116,21 @@ export default function GameDetail() {
       alert('경기 삭제 권한은 관리자 계정만 가지고 있습니다.');
       return;
     }
-    if (confirm(`'vs ${game.opponent}' 경기를 삭제하시겠습니까? 관련 모든 기록이 삭제됩니다.`)) {
+    if (confirm(`'${game.opponent}' 경기를 삭제하시겠습니까? 관련된 모든 타순 및 기록이 삭제됩니다.`)) {
       removeGame(game.id);
       navigate('/games');
     }
   };
 
-  const handleOpenPicker = (position: Position) => {
-    if (!isAdmin) {
-      alert('라인업 포지션 배정은 관리자만 가능합니다.');
-      return;
-    }
-    if (game.status === 'completed') return;
+  const handleOpenPicker = (pos: Position) => {
+    if (!isAdmin || game.status !== 'upcoming') return;
+    setShowPlayerPicker(pos);
     setPickerSearch('');
-    setShowPlayerPicker(position);
   };
 
-  const handleAssignPlayer = (playerId: string, positionOverride?: Position) => {
-    const position = positionOverride || showPlayerPicker;
-    if (!position || !isAdmin) return;
-
+  const handleAssignPlayer = (playerId: string) => {
+    if (!isAdmin || !showPlayerPicker) return;
+    const position = showPlayerPicker;
     const maxOrder = currentAssignments.reduce((m, a) => Math.max(m, a.battingOrder), 0);
 
     let newAssignments = currentAssignments.filter(a => a.position !== position);
@@ -141,6 +145,22 @@ export default function GameDetail() {
     updateGameAssignments(game.id, newAssignments, targetTeam);
     setShowPlayerPicker(null);
     setQuickSearch('');
+  };
+
+  const handleQuickAssign = (playerId: string, position: Position) => {
+    if (!isAdmin) return;
+    const maxOrder = currentAssignments.reduce((m, a) => Math.max(m, a.battingOrder), 0);
+
+    let newAssignments = currentAssignments.filter(a => a.position !== position);
+    newAssignments = newAssignments.filter(a => a.playerId !== playerId);
+    newAssignments.push({
+      position,
+      playerId,
+      battingOrder: position === 'MANAGER' ? 0 : maxOrder + 1,
+    });
+
+    const targetTeam = isInternal ? internalTeamTab : 'main';
+    updateGameAssignments(game.id, newAssignments, targetTeam);
   };
 
   const handleRemovePosition = (position: string) => {
@@ -185,6 +205,57 @@ export default function GameDetail() {
     return selectedPlayerIds.map(id => players.find(p => p.id === id)!).filter(Boolean).sort((a, b) => a.number - b.number);
   }, [selectedPlayerIds, players]);
 
+  // 기록 수정 모드 시작 (기존 데이터 폼에 복원)
+  const handleStartEditRecord = () => {
+    if (!isAdmin) {
+      alert('경기 기록 수정은 관리자 계정으로 로그인 후 가능합니다.');
+      return;
+    }
+    setResult(game.result || 'W');
+    setScoreUs(game.scoreUs !== undefined ? String(game.scoreUs) : '');
+    setScoreThem(game.scoreThem !== undefined ? String(game.scoreThem) : '');
+
+    const pIds = new Set<string>();
+    const bMap: Record<string, BattingStats> = {};
+    const pMap: Record<string, PitchingStats> = {};
+
+    (game.battingStats || []).forEach(b => {
+      pIds.add(b.playerId);
+      bMap[b.playerId] = { ...b };
+    });
+
+    (game.pitchingStats || []).forEach(p => {
+      pIds.add(p.playerId);
+      pMap[p.playerId] = { ...p };
+    });
+
+    // 라인업에 배정된 선수들도 기본값으로 추가
+    const assignments = isInternal 
+      ? [...(game.blueAssignments || []), ...(game.whiteAssignments || [])]
+      : (game.assignments || []);
+    
+    assignments.forEach(a => {
+      if (a.playerId) {
+        pIds.add(a.playerId);
+        if (!bMap[a.playerId]) bMap[a.playerId] = emptyBattingStats(a.playerId);
+        if (!pMap[a.playerId]) pMap[a.playerId] = emptyPitchingStats(a.playerId);
+      }
+    });
+
+    setSelectedPlayerIds(Array.from(pIds));
+    setBattingData(bMap);
+    setPitchingData(pMap);
+    setIsEditingRecord(true);
+    setRecordStep('stats');
+    setTab('record');
+  };
+
+  // 기록 수정 취소
+  const handleCancelEditRecord = () => {
+    setIsEditingRecord(false);
+  };
+
+  // 경기 기록 저장 / 수정 저장
   const handleSaveRecord = () => {
     if (!isAdmin) {
       alert('경기 기록 입력은 관리자 계정으로 로그인 후 가능합니다.');
@@ -201,7 +272,7 @@ export default function GameDetail() {
 
     const finalBatting = selectedPlayerIds
       .map(id => battingData[id])
-      .filter(b => b && (b.PA > 0 || b.AB > 0 || b.H > 0 || b.BB > 0 || b.RBI > 0));
+      .filter(b => b && (b.PA > 0 || b.AB > 0 || b.H > 0 || b.BB > 0 || b.RBI > 0 || b.R > 0 || b.SB > 0 || b.SO > 0));
 
     const finalPitching = selectedPlayerIds
       .map(id => pitchingData[id])
@@ -212,7 +283,46 @@ export default function GameDetail() {
       parseInt(scoreUs, 10), parseInt(scoreThem, 10),
       finalBatting, finalPitching
     );
-    alert('경기 기록이 저장되었습니다!');
+    setIsEditingRecord(false);
+    alert(game.status === 'completed' ? '경기 기록이 성공적으로 수정되었습니다!' : '경기 기록이 저장되었습니다!');
+  };
+
+  // 완료된 경기를 예정 상태로 되돌리기
+  const handleResetToUpcoming = () => {
+    if (!isAdmin) return;
+    if (confirm('경기를 "예정 경기" 상태로 되돌리고 등록된 기록을 초기화하시겠습니까?')) {
+      updateGame(game.id, {
+        status: 'upcoming',
+        result: undefined,
+        scoreUs: undefined,
+        scoreThem: undefined,
+        battingStats: [],
+        pitchingStats: [],
+      });
+      setIsEditingRecord(false);
+      alert('경기가 예정 상태로 변경되었습니다.');
+    }
+  };
+
+  // 경기 기본 정보 수정
+  const handleOpenEditInfo = () => {
+    if (!isAdmin) return;
+    setEditGameDate(game.gameDate);
+    setEditOpponent(game.opponent);
+    setEditSeasonId(game.seasonId || '');
+    setShowEditGameInfo(true);
+  };
+
+  const handleSaveGameInfo = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!isAdmin || !editGameDate) return;
+    updateGame(game.id, {
+      gameDate: editGameDate,
+      opponent: isInternal ? '한방 스윙스 자체 청백전' : editOpponent.trim(),
+      seasonId: editSeasonId || undefined,
+    });
+    setShowEditGameInfo(false);
+    alert('경기 정보가 수정되었습니다.');
   };
 
   const handleDownloadTemplate = () => {
@@ -282,11 +392,25 @@ export default function GameDetail() {
         </button>
         <div className="flex-1">
           <div className="flex items-center gap-3 flex-wrap">
-            <h2 className="text-xl font-extrabold text-slate-900">
+            <h2 className="text-xl font-extrabold text-slate-900 flex items-center gap-2">
               {isInternal ? '한방 스윙스 자체 청백전' : `vs ${game.opponent}`}
+              {isAdmin && (
+                <button
+                  onClick={handleOpenEditInfo}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+                  title="경기 정보 (날짜, 상대팀, 리그) 수정"
+                >
+                  <Pencil className="w-4 h-4" />
+                </button>
+              )}
             </h2>
             {isInternal && (
               <span className="badge badge-blue">청백전</span>
+            )}
+            {currentSeason && (
+              <span className="badge bg-amber-50 text-amber-700 border-amber-200 text-xs">
+                <Trophy className="w-3 h-3 inline mr-1" />{currentSeason.name}
+              </span>
             )}
             {!isUpcoming && (
               <span className={`badge ${game.result === 'W' ? 'badge-win' : game.result === 'L' ? 'badge-loss' : 'badge-draw'}`}>
@@ -316,7 +440,7 @@ export default function GameDetail() {
       {!isAdmin && (
         <div className="bg-slate-100 border border-slate-200 text-slate-600 p-3 rounded-xl text-xs flex items-center gap-2">
           <Lock className="w-4 h-4 text-slate-500 shrink-0" />
-          <span><strong>일반 회원 모드 (조회 전용):</strong> 라인업 및 기록 편집은 관리자 계정로그인 후 가능합니다.</span>
+          <span><strong>일반 회원 모드 (조회 전용):</strong> 라인업 및 기록 편집은 관리자 계정 로그인 후 가능합니다.</span>
         </div>
       )}
 
@@ -329,7 +453,7 @@ export default function GameDetail() {
           }`}
         >
           <Target className="w-4 h-4 inline mr-2" />
-          라인업 & 타순 배치
+          라인업 &amp; 타순 배치
         </button>
         <button
           onClick={() => setTab('record')}
@@ -338,7 +462,7 @@ export default function GameDetail() {
           }`}
         >
           <ClipboardList className="w-4 h-4 inline mr-2" />
-          {isUpcoming ? '경기 기록 입력' : '경기 기록'}
+          {isUpcoming ? '경기 기록 입력' : isEditingRecord ? '경기 기록 수정 중' : '경기 기록'}
         </button>
       </div>
 
@@ -370,83 +494,21 @@ export default function GameDetail() {
             </div>
           )}
 
-          {isAdmin && isUpcoming && (
-            <div className="glass-card p-3 bg-slate-900 text-white relative">
-              <div className="flex items-center gap-2">
-                <Search className="w-4 h-4 text-slate-400 shrink-0 ml-2" />
-                <input
-                  type="text"
-                  placeholder="선수 이름 또는 등번호 직접 검색하여 타순/포지션에 바로 추가..."
-                  className="bg-transparent text-white placeholder-slate-400 text-xs flex-1 outline-none font-bold py-1.5"
-                  value={quickSearch}
-                  onChange={e => setQuickSearch(e.target.value)}
-                />
-                {quickSearch && (
-                  <button onClick={() => setQuickSearch('')} className="text-slate-400 hover:text-white mr-1">
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-
-              {quickSearchMatches.length > 0 && (
-                <div className="absolute left-0 right-0 top-full mt-2 bg-white text-slate-900 border border-slate-200 rounded-xl shadow-xl z-30 max-h-64 overflow-y-auto p-2 space-y-1 animate-scale-in">
-                  <div className="text-[10px] text-slate-400 font-bold px-2 py-1 uppercase">검색된 선수 목록</div>
-                  {quickSearchMatches.map(player => {
-                    const isAlreadyAssigned = assignedPlayerIds.has(player.id);
-                    return (
-                      <div
-                        key={player.id}
-                        className="flex items-center justify-between p-2 rounded-lg hover:bg-slate-100 transition-colors"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="w-7 h-7 rounded bg-slate-900 text-white text-xs font-black flex items-center justify-center">
-                            #{player.number}
-                          </span>
-                          <span className="font-extrabold text-sm">{player.name}</span>
-                          <span className="text-xs text-slate-500 font-medium">({player.positions?.join(', ')})</span>
-                          {isAlreadyAssigned && (
-                            <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.5 rounded font-bold">배정됨</span>
-                          )}
-                        </div>
-
-                        <div className="flex gap-1 flex-wrap justify-end">
-                          {FIELD_POSITIONS.map(pos => (
-                            <button
-                              key={pos}
-                              onClick={() => handleAssignPlayer(player.id, pos)}
-                              className="px-2 py-1 rounded text-xs font-bold bg-slate-100 hover:bg-slate-900 hover:text-white transition-colors border border-slate-200"
-                            >
-                              {pos}
-                            </button>
-                          ))}
-                          <button
-                            onClick={() => handleAssignPlayer(player.id, 'DH')}
-                            className="px-2 py-1 rounded text-xs font-bold bg-amber-100 text-amber-900 hover:bg-amber-600 hover:text-white transition-colors border border-amber-200"
-                          >
-                            DH
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
+          {/* 라인업 공유 바 */}
+          <div className="glass-card p-3 flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-xs font-bold text-slate-700">
+              <Share2 className="w-4 h-4 text-green-600" />
+              <span>{isInternal ? `${internalTeamTab === 'blue' ? '청팀' : '백팀'} 라인업 공유 링크` : '라인업 공유 링크 생성'}</span>
             </div>
-          )}
-
-          <div className="flex items-center justify-between">
-            <h3 className="font-extrabold text-slate-900 text-base">
-              {isInternal ? (internalTeamTab === 'blue' ? '청팀 선발 라인업' : '백팀 선발 라인업') : '선발 라인업 & 타순'}
-            </h3>
-            <button onClick={handleShare} className="btn-secondary text-xs px-3 py-1.5">
-              <Share2 className="w-3.5 h-3.5" /> 라인업 웹 공유
+            <button onClick={handleShare} className="btn-primary text-xs py-1.5 px-3 flex items-center gap-1">
+              <Share2 className="w-3.5 h-3.5" /> 링크 생성
             </button>
           </div>
 
           {shareUrl && (
-            <div className="p-3 bg-slate-100 border border-slate-200 rounded-xl flex items-center gap-2 animate-scale-in">
-              <input type="text" value={shareUrl} readOnly className="input-field text-xs flex-1" />
-              <button onClick={handleCopy} className="btn-primary px-3 py-2 text-xs">
+            <div className="p-3 bg-green-50 border border-green-200 rounded-xl flex items-center gap-2 animate-fade-in">
+              <input type="text" readOnly value={shareUrl} className="input-field text-xs flex-1 bg-white" />
+              <button onClick={handleCopy} className="btn-secondary text-xs py-1.5 px-3 flex items-center gap-1 shrink-0">
                 {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
               </button>
             </div>
@@ -484,6 +546,7 @@ export default function GameDetail() {
             </div>
 
             <div className="glass-card p-5">
+              <h3 className="font-bold text-slate-900 text-sm mb-3">타순 및 배정 명단</h3>
               <BattingOrderList
                 assignments={currentAssignments}
                 players={players}
@@ -499,28 +562,60 @@ export default function GameDetail() {
       {/* ===== 기록 탭 ===== */}
       {tab === 'record' && (
         <div className="space-y-6">
-          {game.status === 'completed' ? (
+          {/* 완료된 경기 조회 뷰 (수정 모드가 아닐 때) */}
+          {game.status === 'completed' && !isEditingRecord ? (
             <div className="space-y-4">
+              {/* 스코어보드 및 관리자 액션 바 */}
               <div className="glass-card p-5">
-                <h3 className="font-bold text-slate-900 mb-3">경기 결과 스코어</h3>
-                <div className="flex items-center gap-6">
-                  <div className="text-center">
-                    <div className="text-xs text-slate-500 font-bold">{isInternal ? '청팀' : '한방 스윙스'}</div>
-                    <div className="text-3xl font-extrabold text-slate-900">{game.scoreUs}</div>
+                <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 flex-wrap gap-2">
+                  <h3 className="font-bold text-slate-900 text-base">경기 결과 스코어</h3>
+                  {isAdmin && (
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={handleStartEditRecord}
+                        className="btn-primary text-xs py-2 px-3 flex items-center gap-1.5 bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                        기록 수정하기
+                      </button>
+                      <button
+                        onClick={handleResetToUpcoming}
+                        className="btn-secondary text-xs py-2 px-3 flex items-center gap-1.5 text-slate-600 hover:text-red-600"
+                        title="경기를 예정 상태로 되돌리고 기록을 초기화합니다"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                        예정으로 초기화
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-6 justify-center py-2">
+                  <div className="text-center min-w-[100px]">
+                    <div className="text-xs text-slate-500 font-bold mb-1">{isInternal ? '청팀' : '한방 스윙스'}</div>
+                    <div className="text-4xl font-extrabold text-slate-900">{game.scoreUs}</div>
                   </div>
-                  <div className="text-slate-400 font-bold text-base">VS</div>
-                  <div className="text-center">
-                    <div className="text-xs text-slate-500 font-bold">{isInternal ? '백팀' : game.opponent}</div>
-                    <div className="text-3xl font-extrabold text-slate-700">{game.scoreThem}</div>
+                  <div className="text-slate-400 font-extrabold text-lg px-2">VS</div>
+                  <div className="text-center min-w-[100px]">
+                    <div className="text-xs text-slate-500 font-bold mb-1">{isInternal ? '백팀' : game.opponent}</div>
+                    <div className="text-4xl font-extrabold text-slate-700">{game.scoreThem}</div>
                   </div>
                 </div>
               </div>
 
-              {/* 타격 기록 조회 (한글 용어 헤더) */}
+              {/* 타격 기록 조회 */}
               {game.battingStats.length > 0 && (
                 <div className="glass-card overflow-hidden">
-                  <div className="p-4 border-b border-slate-200 bg-slate-50">
-                    <h3 className="font-bold text-slate-900 text-sm">타격 기록</h3>
+                  <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                    <h3 className="font-bold text-slate-900 text-sm">⚾ 타격 기록 ({game.battingStats.length}명)</h3>
+                    {isAdmin && (
+                      <button
+                        onClick={handleStartEditRecord}
+                        className="text-xs text-amber-700 hover:text-amber-900 font-bold flex items-center gap-1"
+                      >
+                        <Pencil className="w-3 h-3" /> 수정
+                      </button>
+                    )}
                   </div>
                   <div className="overflow-x-auto">
                     <table className="stats-table">
@@ -548,11 +643,19 @@ export default function GameDetail() {
                 </div>
               )}
 
-              {/* 투수 기록 조회 (한글 용어 헤더) */}
+              {/* 투수 기록 조회 */}
               {game.pitchingStats.length > 0 && (
                 <div className="glass-card overflow-hidden">
-                  <div className="p-4 border-b border-slate-200 bg-slate-50">
-                    <h3 className="font-bold text-slate-900 text-sm">투구 기록</h3>
+                  <div className="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+                    <h3 className="font-bold text-slate-900 text-sm">🥎 투구 기록 ({game.pitchingStats.length}명)</h3>
+                    {isAdmin && (
+                      <button
+                        onClick={handleStartEditRecord}
+                        className="text-xs text-amber-700 hover:text-amber-900 font-bold flex items-center gap-1"
+                      >
+                        <Pencil className="w-3 h-3" /> 수정
+                      </button>
+                    )}
                   </div>
                   <div className="overflow-x-auto">
                     <table className="stats-table">
@@ -582,6 +685,23 @@ export default function GameDetail() {
           ) : (
             isAdmin ? (
               <div className="space-y-6">
+                {/* 기록 수정 모드 배지 */}
+                {isEditingRecord && (
+                  <div className="p-4 rounded-xl bg-amber-50 border border-amber-300 flex items-center justify-between gap-3 shadow-xs">
+                    <div className="flex items-center gap-2 text-amber-900 font-bold text-sm">
+                      <Edit3 className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>경기 기록 수정 모드 진행 중입니다. 수정 완료 후 하단의 저장 버튼을 누르세요.</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCancelEditRecord}
+                      className="px-3 py-1.5 rounded-lg bg-white border border-amber-300 text-amber-800 hover:bg-amber-100 text-xs font-bold transition-all shrink-0"
+                    >
+                      수정 취소
+                    </button>
+                  </div>
+                )}
+
                 <div className="glass-card p-5">
                   <h3 className="font-bold text-slate-900 mb-3">경기 결과 및 스코어 입력</h3>
                   <div className="grid grid-cols-3 gap-3">
@@ -612,7 +732,7 @@ export default function GameDetail() {
                     </div>
                     <div>
                       <h4 className="text-sm font-extrabold text-emerald-950 flex items-center gap-1.5">
-                        엑셀(Excel) 파일로 경기 기록 일괄 입력
+                        엑셀(Excel) 파일로 경기 기록 일괄 입력 / 덮어쓰기
                         <span className="badge bg-emerald-600 text-white text-[10px] px-1.5 py-0.2">스마트 매칭</span>
                       </h4>
                       <p className="text-xs text-emerald-800 font-medium">선수 목록이 채워진 양식을 받거나, 작성된 엑셀을 업로드하여 성적을 한 번에 반영하세요.</p>
@@ -735,9 +855,14 @@ export default function GameDetail() {
                   </div>
                 </div>
 
-                <div className="flex justify-end">
+                <div className="flex justify-between items-center pt-2">
+                  {isEditingRecord ? (
+                    <button type="button" onClick={handleCancelEditRecord} className="btn-secondary">
+                      수정 취소
+                    </button>
+                  ) : <div />}
                   <button onClick={handleSaveRecord} className="btn-green text-base px-6 py-3">
-                    <Check className="w-5 h-5" /> 경기 최종 기록 저장하기
+                    <Check className="w-5 h-5" /> {isEditingRecord ? '경기 기록 수정 완료 저장' : '경기 최종 기록 저장하기'}
                   </button>
                 </div>
               </div>
@@ -749,6 +874,76 @@ export default function GameDetail() {
               </div>
             )
           )}
+        </div>
+      )}
+
+      {/* 경기 기본 정보 수정 모달 */}
+      {showEditGameInfo && isAdmin && (
+        <div className="modal-overlay" onClick={() => setShowEditGameInfo(false)}>
+          <div className="modal-content p-6 max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-200">
+              <h3 className="font-extrabold text-slate-900 text-base flex items-center gap-2">
+                <Pencil className="w-4 h-4 text-green-600" />
+                경기 기본 정보 수정
+              </h3>
+              <button onClick={() => setShowEditGameInfo(false)} className="text-slate-400 hover:text-slate-700">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveGameInfo} className="space-y-4">
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block font-medium">경기 날짜</label>
+                <input
+                  type="date"
+                  className="input-field"
+                  value={editGameDate}
+                  onChange={e => setEditGameDate(e.target.value)}
+                  required
+                />
+              </div>
+
+              {!isInternal && (
+                <div>
+                  <label className="text-xs text-slate-500 mb-1 block font-medium">상대팀 이름</label>
+                  <input
+                    type="text"
+                    className="input-field"
+                    value={editOpponent}
+                    onChange={e => setEditOpponent(e.target.value)}
+                    required
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="text-xs text-slate-500 mb-1 block font-medium flex items-center gap-1">
+                  <Trophy className="w-3 h-3 text-amber-500" /> 소속 리그 선택
+                </label>
+                <select
+                  className="input-field text-sm"
+                  value={editSeasonId}
+                  onChange={e => setEditSeasonId(e.target.value)}
+                >
+                  <option value="">미분류 (소속 리그 없음)</option>
+                  {seasons.map(s => (
+                    <option key={s.id} value={s.id}>
+                      {s.name} ({s.startDate} ~ {s.endDate})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex justify-end gap-2 pt-3 border-t border-slate-200">
+                <button type="button" onClick={() => setShowEditGameInfo(false)} className="btn-secondary text-xs">
+                  취소
+                </button>
+                <button type="submit" className="btn-primary text-xs">
+                  저장하기
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
 
