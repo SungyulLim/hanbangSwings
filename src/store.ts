@@ -1,27 +1,24 @@
-// ===== Zustand 스토어 (데이터 영구 보존 & 과거 버전 자동 마이그레이션 & 백업/복원 지원) =====
+// ===== Zustand 스토어 (로컬 영구 보존 & Firebase 실시간 클라우드 자동 동기화) =====
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Player, Game, Season, PositionAssignment, SharedLineupData, BattingStats, PitchingStats, GameResult, GameType } from './types';
 import { MAX_PLAYERS } from './types';
-import { demoPlayers, demoGames, demoSeasons } from './data/demo';
+import {
+  initialPlayers,
+  initialGames,
+  initialSeasons,
+  CURRENT_DATA_VERSION,
+  CURRENT_DATA_TIMESTAMP,
+} from './data/initialData';
+import {
+  subscribeToCloudStore,
+  saveToCloudStore,
+  type CloudSyncStatus,
+} from './services/cloudStore';
 
 function generateId(): string {
   return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
 }
-
-// 과거 저장소 키 목록 (자동 데이터 복구용)
-const LEGACY_STORAGE_KEYS = [
-  'hanbang-swings-store-v9',
-  'hanbang-swings-store-v8',
-  'hanbang-swings-store-v7',
-  'hanbang-swings-store-v6',
-  'hanbang-swings-store-v5',
-  'hanbang-swings-store-v4',
-  'hanbang-swings-store-v3',
-  'hanbang-swings-store-v2',
-  'hanbang-swings-store-v1',
-  'hanbang-swings-store',
-];
 
 interface AppState {
   players: Player[];
@@ -29,6 +26,12 @@ interface AppState {
   seasons: Season[];
   initialized: boolean;
   isAdmin: boolean;
+  dataVersion?: string;
+
+  // Cloud Sync 상태
+  isCloudConnected: boolean;
+  cloudSyncStatus: CloudSyncStatus;
+  initCloudSync: () => void;
 
   // Admin Auth
   loginAdmin: (password: string) => boolean;
@@ -60,9 +63,18 @@ interface AppState {
   exportData: () => string;
   importData: (jsonStr: string) => boolean;
 
-  // Init & Reset
+  // Init & Sync & Reset
   initializeWithDemo: () => void;
   resetToDemo: () => void;
+  syncWithOfficialData: () => void;
+}
+
+// 클라우드 저장 헬퍼 (상태 업데이트 후 자동 실행)
+function syncToCloudIfConnected(get: () => AppState, set: (partial: Partial<AppState>) => void) {
+  const { players, games, seasons, isCloudConnected } = get();
+  if (isCloudConnected) {
+    saveToCloudStore({ players, games, seasons }, (status) => set({ cloudSyncStatus: status }));
+  }
 }
 
 export const useAppStore = create<AppState>()(
@@ -73,6 +85,30 @@ export const useAppStore = create<AppState>()(
       seasons: [],
       initialized: false,
       isAdmin: false,
+      dataVersion: undefined,
+      isCloudConnected: false,
+      cloudSyncStatus: 'disconnected',
+
+      initCloudSync: () => {
+        subscribeToCloudStore(
+          (cloudData) => {
+            set({
+              players: cloudData.players,
+              games: cloudData.games,
+              seasons: cloudData.seasons,
+              isCloudConnected: true,
+              cloudSyncStatus: 'connected',
+              initialized: true,
+            });
+          },
+          (status) => {
+            set({
+              cloudSyncStatus: status,
+              isCloudConnected: status === 'connected' || status === 'syncing',
+            });
+          }
+        );
+      },
 
       loginAdmin: (password: string) => {
         if (password === 'hanbang2026') {
@@ -94,16 +130,22 @@ export const useAppStore = create<AppState>()(
           id: generateId(),
           createdAt: new Date().toISOString(),
         };
-        set({ players: [...players, newPlayer] });
+        const nextPlayers = [...players, newPlayer];
+        set({ players: nextPlayers });
+        syncToCloudIfConnected(get, set);
         return true;
       },
 
       updatePlayer: (id, data) => {
-        set({ players: get().players.map(p => p.id === id ? { ...p, ...data } : p) });
+        const nextPlayers = get().players.map(p => p.id === id ? { ...p, ...data } : p);
+        set({ players: nextPlayers });
+        syncToCloudIfConnected(get, set);
       },
 
       removePlayer: (id) => {
-        set({ players: get().players.filter(p => p.id !== id) });
+        const nextPlayers = get().players.filter(p => p.id !== id);
+        set({ players: nextPlayers });
+        syncToCloudIfConnected(get, set);
       },
 
       addSeason: (name, startDate, endDate) => {
@@ -115,20 +157,26 @@ export const useAppStore = create<AppState>()(
           endDate,
           createdAt: new Date().toISOString(),
         };
-        set({ seasons: [...get().seasons, newSeason] });
+        const nextSeasons = [...get().seasons, newSeason];
+        set({ seasons: nextSeasons });
+        syncToCloudIfConnected(get, set);
         return id;
       },
 
       updateSeason: (id, data) => {
-        set({ seasons: get().seasons.map(s => s.id === id ? { ...s, ...data } : s) });
+        const nextSeasons = get().seasons.map(s => s.id === id ? { ...s, ...data } : s);
+        set({ seasons: nextSeasons });
+        syncToCloudIfConnected(get, set);
       },
 
       removeSeason: (id) => {
-        // 해당 리그에 속한 경기의 seasonId를 undefined로 초기화
+        const nextSeasons = get().seasons.filter(s => s.id !== id);
+        const nextGames = get().games.map(g => g.seasonId === id ? { ...g, seasonId: undefined } : g);
         set({
-          seasons: get().seasons.filter(s => s.id !== id),
-          games: get().games.map(g => g.seasonId === id ? { ...g, seasonId: undefined } : g),
+          seasons: nextSeasons,
+          games: nextGames,
         });
+        syncToCloudIfConnected(get, set);
       },
 
       addGame: (gameDate, opponent, gameType = 'external', seasonId) => {
@@ -148,37 +196,43 @@ export const useAppStore = create<AppState>()(
           pitchingStats: [],
           createdAt: new Date().toISOString(),
         };
-        set({ games: [...get().games, newGame] });
+        const nextGames = [...get().games, newGame];
+        set({ games: nextGames });
+        syncToCloudIfConnected(get, set);
         return id;
       },
 
       updateGame: (id, data) => {
-        set({ games: get().games.map(g => g.id === id ? { ...g, ...data } : g) });
+        const nextGames = get().games.map(g => g.id === id ? { ...g, ...data } : g);
+        set({ games: nextGames });
+        syncToCloudIfConnected(get, set);
       },
 
       removeGame: (id) => {
-        set({ games: get().games.filter(g => g.id !== id) });
+        const nextGames = get().games.filter(g => g.id !== id);
+        set({ games: nextGames });
+        syncToCloudIfConnected(get, set);
       },
 
       completeGame: (id, result, scoreUs, scoreThem, battingStats, pitchingStats) => {
-        set({
-          games: get().games.map(g =>
-            g.id === id
-              ? { ...g, status: 'completed' as const, result, scoreUs, scoreThem, battingStats, pitchingStats }
-              : g
-          ),
-        });
+        const nextGames = get().games.map(g =>
+          g.id === id
+            ? { ...g, status: 'completed' as const, result, scoreUs, scoreThem, battingStats, pitchingStats }
+            : g
+        );
+        set({ games: nextGames });
+        syncToCloudIfConnected(get, set);
       },
 
       updateGameAssignments: (gameId, assignments, targetTeam = 'main') => {
-        set({
-          games: get().games.map(g => {
-            if (g.id !== gameId) return g;
-            if (targetTeam === 'blue') return { ...g, blueAssignments: assignments };
-            if (targetTeam === 'white') return { ...g, whiteAssignments: assignments };
-            return { ...g, assignments };
-          }),
+        const nextGames = get().games.map(g => {
+          if (g.id !== gameId) return g;
+          if (targetTeam === 'blue') return { ...g, blueAssignments: assignments };
+          if (targetTeam === 'white') return { ...g, whiteAssignments: assignments };
+          return { ...g, assignments };
         });
+        set({ games: nextGames });
+        syncToCloudIfConnected(get, set);
       },
 
       encodeLineupForShare: (gameId, targetTeam = 'main') => {
@@ -229,6 +283,7 @@ export const useAppStore = create<AppState>()(
           title: '한방 스윙스 데이터 백업',
           exportDate: new Date().toISOString(),
           version: 1,
+          dataVersion: CURRENT_DATA_VERSION,
           players,
           games,
           seasons,
@@ -242,12 +297,15 @@ export const useAppStore = create<AppState>()(
           if (!data.players || !Array.isArray(data.players)) {
             return false;
           }
-          set({
+          const nextState = {
             players: data.players,
             games: Array.isArray(data.games) ? data.games : [],
-            seasons: Array.isArray(data.seasons) && data.seasons.length > 0 ? data.seasons : demoSeasons,
+            seasons: Array.isArray(data.seasons) && data.seasons.length > 0 ? data.seasons : initialSeasons,
+            dataVersion: data.dataVersion || CURRENT_DATA_VERSION,
             initialized: true,
-          });
+          };
+          set(nextState);
+          syncToCloudIfConnected(get, set);
           return true;
         } catch {
           return false;
@@ -255,59 +313,69 @@ export const useAppStore = create<AppState>()(
       },
 
       initializeWithDemo: () => {
-        const { initialized, players, games, seasons } = get();
+        const { initialized, dataVersion, players, games } = get();
 
-        // 1. 이미 스토어에 데이터가 존재하면 절대 덮어쓰지 않고 기존 데이터 유지!
-        if (initialized && (players.length > 0 || games.length > 0)) {
-          if (seasons.length === 0) {
-            set({ seasons: demoSeasons });
-          }
+        // 1. 배포된 공식 데이터 버전과 로컬 저장소의 데이터 버전이 다르면 자동 갱신
+        if (dataVersion !== CURRENT_DATA_VERSION) {
+          set({
+            players: initialPlayers,
+            games: initialGames,
+            seasons: initialSeasons,
+            dataVersion: CURRENT_DATA_VERSION,
+            initialized: true,
+          });
           return;
         }
 
-        // 2. 현재 스토어가 비어있다면, 과거 버전의 localStorage 키에서 기존 사용자 데이터 복구 시도
-        if (typeof window !== 'undefined') {
-          for (const key of LEGACY_STORAGE_KEYS) {
-            try {
-              const raw = localStorage.getItem(key);
-              if (raw) {
-                const parsed = JSON.parse(raw);
-                const state = parsed.state || parsed;
-                if (state && Array.isArray(state.players) && state.players.length > 0) {
-                  set({
-                    players: state.players,
-                    games: Array.isArray(state.games) ? state.games : [],
-                    seasons: Array.isArray(state.seasons) && state.seasons.length > 0 ? state.seasons : demoSeasons,
-                    initialized: true,
-                  });
-                  return;
-                }
-              }
-            } catch {
-              // ignore parse errors
-            }
-          }
+        // 2. 이미 최신 버전으로 초기화되었고 데이터가 존재하면 기존 상태 유지
+        if (initialized && (players.length > 0 || games.length > 0)) {
+          return;
         }
 
-        // 3. 브라우저에 저장된 이전 데이터가 전혀 없는 최초 방문자일 때만 데모 데이터 로드
+        // 3. 브라우저 최초 방문 시 최신 공식 마스터 데이터 로드
         set({
-          players: demoPlayers,
-          games: demoGames,
-          seasons: demoSeasons,
+          players: initialPlayers,
+          games: initialGames,
+          seasons: initialSeasons,
+          dataVersion: CURRENT_DATA_VERSION,
           initialized: true,
         });
+      },
+
+      syncWithOfficialData: () => {
+        set({
+          players: initialPlayers,
+          games: initialGames,
+          seasons: initialSeasons,
+          dataVersion: CURRENT_DATA_VERSION,
+          initialized: true,
+        });
+        syncToCloudIfConnected(get, set);
       },
 
       resetToDemo: () => {
         set({
-          players: demoPlayers,
-          games: demoGames,
-          seasons: demoSeasons,
+          players: initialPlayers,
+          games: initialGames,
+          seasons: initialSeasons,
+          dataVersion: CURRENT_DATA_VERSION,
           initialized: true,
         });
+        syncToCloudIfConnected(get, set);
       },
     }),
-    { name: 'hanbang-swings-main-storage' }
+    {
+      name: 'hanbang-swings-main-storage',
+      // isCloudConnected와 cloudSyncStatus는 휘발성이므로 제외
+      partialize: (state) => ({
+        players: state.players,
+        games: state.games,
+        seasons: state.seasons,
+        initialized: state.initialized,
+        isAdmin: state.isAdmin,
+        dataVersion: state.dataVersion,
+      }),
+    }
   )
 );
 
@@ -319,3 +387,4 @@ export function decodeSharedLineup(encoded: string): SharedLineupData | null {
     return null;
   }
 }
+export { CURRENT_DATA_VERSION, CURRENT_DATA_TIMESTAMP };

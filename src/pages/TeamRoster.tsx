@@ -96,7 +96,7 @@ export default function TeamRoster() {
       alert('로스터 초기화는 관리자 계정만 가능합니다.');
       return;
     }
-    if (confirm('로스터를 배번순 공식 23명 실제 동아리원 데이터로 초기화하시겠습니까?')) {
+    if (confirm('로스터를 배번순 공식 27명 실제 동아리원 데이터로 초기화하시겠습니까?')) {
       resetToDemo();
     }
   };

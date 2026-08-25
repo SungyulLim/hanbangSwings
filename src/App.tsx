@@ -11,10 +11,12 @@ import SharedLineup from './pages/SharedLineup';
 
 export default function App() {
   const initializeWithDemo = useAppStore(s => s.initializeWithDemo);
+  const initCloudSync = useAppStore(s => s.initCloudSync);
 
   useEffect(() => {
     initializeWithDemo();
-  }, [initializeWithDemo]);
+    initCloudSync();
+  }, [initializeWithDemo, initCloudSync]);
 
   return (
     <Routes>
